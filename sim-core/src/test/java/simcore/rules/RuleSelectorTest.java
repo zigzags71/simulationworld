@@ -15,7 +15,8 @@ class RuleSelectorTest {
 
     @Test
     void higherTrustDominatesSelection() {
-        AgentState agent = new AgentState(new AgentId(1), 0, 0, SimConfig.INITIAL_ENERGY, 0);
+        AgentState agent = AgentState.forTest(new AgentId(1), 0, 0, SimConfig.INITIAL_ENERGY,
+                SimConfig.INITIAL_HUNGER, SimConfig.INITIAL_STRESS, 0f);
         agent.applyTick(0f, -0.4f, 0.1f);
         ContextKey key = new ContextKey(0, 0, 0, 0, 0, 0, 0, 0);
         List<Rule> rules = new ArrayList<>();

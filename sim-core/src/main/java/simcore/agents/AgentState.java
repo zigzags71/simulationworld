@@ -41,6 +41,16 @@ public class AgentState {
         this.nextRuleId = 1;
     }
 
+    public static AgentState forTest(AgentId id, int x, int y, float energy, float hunger, float stress, float predictionError) {
+        AgentState state = new AgentState(id, x, y, energy, 0, 0, 0);
+        state.ageTicks = 0;
+        state.energy = state.clampMetric(energy);
+        state.hunger = state.clampMetric(hunger);
+        state.stress = state.clampMetric(stress);
+        state.predictionError = state.clampMetric(predictionError);
+        return state;
+    }
+
     public AgentId getId() {
         return id;
     }

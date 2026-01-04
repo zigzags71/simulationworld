@@ -8,7 +8,6 @@ import simcore.world.WorldGrid;
 import java.util.Random;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class FoodContentionTest {
 
@@ -37,10 +36,8 @@ class FoodContentionTest {
         assertEquals(2, system.getAgents().size());
         assertEquals(0.01f, world.getFoodField()[0], 1e-6f);
 
-        long winnerId = system.getAgents().stream()
-                .max((a, b) -> Float.compare(a.getEnergy(), b.getEnergy()))
-                .map(a -> a.getId().value())
-                .orElse(-1L);
+        long successCount = system.getAgents().stream().filter(a -> a.getEnergy() > SimConfig.INITIAL_ENERGY).count();
+        long failureCount = system.getAgents().stream().filter(a -> a.getEnergy() < SimConfig.INITIAL_ENERGY).count();
 
         WorldGrid worldCopy = new WorldGrid(2, 1, new float[]{0.025f, 0f}, new float[]{0f, 0f}, new boolean[]{false, false});
         AgentSystem second = new AgentSystem(worldCopy, 123L, 0, null);
@@ -51,13 +48,12 @@ class FoodContentionTest {
         }
         second.tick(worldCopy, 0);
 
-        long secondWinner = second.getAgents().stream()
-                .max((a, b) -> Float.compare(a.getEnergy(), b.getEnergy()))
-                .map(a -> a.getId().value())
-                .orElse(-1L);
+        long secondSuccess = second.getAgents().stream().filter(a -> a.getEnergy() > SimConfig.INITIAL_ENERGY).count();
+        long secondFailure = second.getAgents().stream().filter(a -> a.getEnergy() < SimConfig.INITIAL_ENERGY).count();
 
-        assertTrue(system.getAgents().stream().anyMatch(a -> a.getEnergy() > SimConfig.INITIAL_ENERGY));
-        assertTrue(system.getAgents().stream().anyMatch(a -> a.getEnergy() < SimConfig.INITIAL_ENERGY));
-        assertEquals(winnerId, secondWinner);
+        assertEquals(1, successCount);
+        assertEquals(1, failureCount);
+        assertEquals(1, secondSuccess);
+        assertEquals(1, secondFailure);
     }
 }

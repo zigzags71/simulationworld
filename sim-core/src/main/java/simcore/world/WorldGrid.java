@@ -12,14 +12,17 @@ import java.util.Random;
 public class WorldGrid {
     private final int width;
     private final int height;
-    private final float[] foodField;
+    private final float[] foodStock;
     private final float[] hazardField;
     private final boolean[] waterMask;
 
-    public WorldGrid(int width, int height, float[] foodField, float[] hazardField, boolean[] waterMask) {
+    private final long seed;
+
+    public WorldGrid(int width, int height, long seed, float[] foodField, float[] hazardField, boolean[] waterMask) {
         this.width = width;
         this.height = height;
-        this.foodField = foodField;
+        this.seed = seed;
+        this.foodStock = foodField;
         this.hazardField = hazardField;
         this.waterMask = waterMask;
     }
@@ -55,7 +58,14 @@ public class WorldGrid {
         }
 
         smooth(water, food, hazard, width, height, config.getWaterRatio());
-        return new WorldGrid(width, height, food, hazard, water);
+        clampFood(food);
+        return new WorldGrid(width, height, config.getSeed(), food, hazard, water);
+    }
+
+    private static void clampFood(float[] food) {
+        for (int i = 0; i < food.length; i++) {
+            food[i] = Math.min(food[i], SimConfig.TILE_FOOD_MAX);
+        }
     }
 
     private static void smooth(boolean[] water, float[] food, float[] hazard, int w, int h, float waterRatio) {
@@ -104,13 +114,12 @@ public class WorldGrid {
         return y * w + x;
     }
 
-    public TileFields getTile(int x, int y) {
-        int idx = index(x, y, width);
-        return new TileFields(foodField[idx], hazardField[idx], waterMask[idx]);
+    public float[] getFoodField() {
+        return foodStock;
     }
 
-    public float[] getFoodField() {
-        return foodField;
+    public float[] getFoodStock() {
+        return foodStock;
     }
 
     public float[] getHazardField() {
@@ -127,5 +136,19 @@ public class WorldGrid {
 
     public int getHeight() {
         return height;
+    }
+
+    public long getSeed() {
+        return seed;
+    }
+
+    public void regenerateFood(float amountPerTile) {
+        if (amountPerTile <= 0f) {
+            return;
+        }
+        for (int i = 0; i < foodStock.length; i++) {
+            float next = foodStock[i] + amountPerTile;
+            foodStock[i] = Math.min(next, SimConfig.TILE_FOOD_MAX);
+        }
     }
 }

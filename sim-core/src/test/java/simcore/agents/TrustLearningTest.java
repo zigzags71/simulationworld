@@ -15,7 +15,7 @@ class TrustLearningTest {
 
     @Test
     void trustMovesUpOnAccuratePredictionsAndDownOnErrors() {
-        WorldGrid world = new WorldGrid(1, 1, new float[]{0.2f}, new float[]{0.1f}, new boolean[]{false});
+        WorldGrid world = new WorldGrid(1, 1, 1L, new float[]{0.2f}, new float[]{0.1f}, new boolean[]{false});
         AgentSystem system = new AgentSystem(world, 99L, 0, null);
         Rule rule = new Rule(1, RuleType.NORMAL, new ContextKey(0, 0, 0, 0, 0, 0, 0, 0), ActionType.IDLE, OutcomeVector.zero(), 0.5f);
 

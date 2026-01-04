@@ -3,6 +3,8 @@ package uiviewer.ui;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
 import javafx.scene.layout.VBox;
+import simcore.naming.CultureNameRegistry;
+import simcore.naming.NameRegistry;
 import simcore.snapshot.RenderSnapshot;
 import simcore.snapshot.RuleView;
 import simcore.snapshot.SelectedAgentDetails;
@@ -12,6 +14,7 @@ import java.util.List;
 
 public class AgentInspectorPanel extends VBox {
     private final Label idLabel = new Label("Agent: none");
+    private final Label nameLabel = new Label("Name: --");
     private final Label positionLabel = new Label("Position: --");
     private final Label ageLabel = new Label("Age: --");
     private final Label energyLabel = new Label("Energy: --");
@@ -19,17 +22,19 @@ public class AgentInspectorPanel extends VBox {
     private final Label stressLabel = new Label("Stress: --");
     private final Label predictionErrorLabel = new Label("Prediction Error: --");
     private final Label awarenessLabel = new Label("Awareness: --");
+    private final Label cultureLabel = new Label("Culture: --");
     private final ListView<String> rulesList = new ListView<>();
 
     public AgentInspectorPanel() {
         setSpacing(4);
         rulesList.setPlaceholder(new Label("No rules"));
-        getChildren().addAll(idLabel, positionLabel, ageLabel, energyLabel, hungerLabel, stressLabel,
-                predictionErrorLabel, awarenessLabel, new Label("Rules"), rulesList);
+        getChildren().addAll(idLabel, nameLabel, positionLabel, ageLabel, energyLabel, hungerLabel, stressLabel,
+                predictionErrorLabel, awarenessLabel, cultureLabel, new Label("Rules"), rulesList);
     }
 
     public void clear() {
         idLabel.setText("Agent: none");
+        nameLabel.setText("Name: --");
         positionLabel.setText("Position: --");
         ageLabel.setText("Age: --");
         energyLabel.setText("Energy: --");
@@ -37,6 +42,7 @@ public class AgentInspectorPanel extends VBox {
         stressLabel.setText("Stress: --");
         predictionErrorLabel.setText("Prediction Error: --");
         awarenessLabel.setText("Awareness: --");
+        cultureLabel.setText("Culture: --");
         rulesList.getItems().clear();
     }
 
@@ -58,6 +64,9 @@ public class AgentInspectorPanel extends VBox {
         stressLabel.setText(String.format("Stress: %.3f", details.getStress()));
         predictionErrorLabel.setText(String.format("Prediction Error: %.3f", details.getPredictionError()));
         awarenessLabel.setText("Awareness: " + details.isAwareness());
+        nameLabel.setText("Name: " + NameRegistry.resolveFirstName(details.getFirstNameId()) + " "
+                + NameRegistry.resolveSurname(details.getSurnameId()));
+        cultureLabel.setText("Culture: " + CultureNameRegistry.resolveCultureName(details.getCultureId()));
         rulesList.getItems().setAll(renderRules(details.getRules()));
     }
 

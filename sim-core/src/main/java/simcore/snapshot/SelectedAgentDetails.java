@@ -10,10 +10,13 @@ public class SelectedAgentDetails {
     private final float stress;
     private final float predictionError;
     private final boolean awareness;
+    private final int firstNameId;
+    private final int surnameId;
+    private final int cultureId;
     private final RuleView[] rules;
 
     public SelectedAgentDetails(long agentId, int x, int y, int ageTicks, float energy, float hunger, float stress, float predictionError,
-                                boolean awareness, RuleView[] rules) {
+                                boolean awareness, int firstNameId, int surnameId, int cultureId, RuleView[] rules) {
         this.agentId = agentId;
         this.x = x;
         this.y = y;
@@ -23,6 +26,9 @@ public class SelectedAgentDetails {
         this.stress = stress;
         this.predictionError = predictionError;
         this.awareness = awareness;
+        this.firstNameId = firstNameId;
+        this.surnameId = surnameId;
+        this.cultureId = cultureId;
         this.rules = rules;
     }
 
@@ -60,6 +66,18 @@ public class SelectedAgentDetails {
 
     public boolean isAwareness() {
         return awareness;
+    }
+
+    public int getFirstNameId() {
+        return firstNameId;
+    }
+
+    public int getSurnameId() {
+        return surnameId;
+    }
+
+    public int getCultureId() {
+        return cultureId;
     }
 
     public RuleView[] getRules() {

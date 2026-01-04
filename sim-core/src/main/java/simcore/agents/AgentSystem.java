@@ -13,6 +13,8 @@ import simcore.rules.RuleSelector;
 import simcore.rules.RuleType;
 import simcore.util.BinningUtil;
 import simcore.util.MathUtil;
+import simcore.naming.NameGenerator;
+import simcore.naming.NameGenerator.NameRecord;
 import simcore.world.WorldGrid;
 
 import java.util.ArrayList;
@@ -32,6 +34,7 @@ public class AgentSystem {
     private AgentState[] agentBuffer = new AgentState[0];
     private float[] hazardBuffer = new float[0];
     private boolean[] skipBuffer = new boolean[0];
+    private final long worldSeed;
     private long nextId;
     private int totalDeaths;
 
@@ -44,6 +47,7 @@ public class AgentSystem {
         this.agents = new ArrayList<>(Math.max(initialPopulation, 16));
         this.actionExecutor = new ActionExecutor(new Random(seed + 13));
         this.eventBus = eventBus;
+        this.worldSeed = world.getSeed();
         this.nextId = 0;
         spawnInitialAgents(world, initialPopulation);
     }
@@ -140,7 +144,11 @@ public class AgentSystem {
             int x = random.nextInt(w);
             int y = random.nextInt(h);
             if (!water[MathUtil.index(x, y, w)]) {
-                AgentState agent = new AgentState(new AgentId(nextId++), x, y, SimConfig.INITIAL_ENERGY, spawned);
+                int tileIndex = MathUtil.index(x, y, w);
+                NameRecord name = NameGenerator.generateForSpawn(nextId, worldSeed, tileIndex, world.getFoodField()[tileIndex],
+                        world.getHazardField()[tileIndex]);
+                AgentState agent = new AgentState(new AgentId(nextId++), x, y, SimConfig.INITIAL_ENERGY,
+                        name.firstNameId(), name.surnameId(), name.cultureId());
                 seedRules(agent, world, new int[w * h]);
                 agents.add(agent);
                 spawned++;
@@ -178,12 +186,15 @@ public class AgentSystem {
         }
         Collections.shuffle(candidates, rand);
         int spawned = 0;
-        int cultureBase = rand.nextInt(Integer.MAX_VALUE);
         for (int i = 0; i < candidates.size() && spawned < count; i++) {
             int idx = candidates.get(i);
             int x = idx % width;
             int y = idx / width;
-            AgentState agent = new AgentState(new AgentId(nextId++), x, y, SimConfig.INITIAL_ENERGY, cultureBase + spawned);
+            int tileIndex = MathUtil.index(x, y, width);
+            NameRecord name = NameGenerator.generateForSpawn(nextId, worldSeed, tileIndex, world.getFoodField()[tileIndex],
+                    world.getHazardField()[tileIndex]);
+            AgentState agent = new AgentState(new AgentId(nextId++), x, y, SimConfig.INITIAL_ENERGY,
+                    name.firstNameId(), name.surnameId(), name.cultureId());
             seedRules(agent, world, new int[width * height]);
             agents.add(agent);
             spawned++;

@@ -22,6 +22,7 @@ import simcore.snapshot.RenderSnapshot;
 import simcore.snapshot.RuleView;
 import simcore.snapshot.SelectedAgentDetails;
 import simcore.snapshot.SnapshotBuffer;
+import simcore.telemetry.SnapshotRecorder;
 import simcore.util.ColorUtil;
 import simcore.util.FieldBrushApplier;
 import simcore.util.MathUtil;
@@ -42,6 +43,7 @@ public class SimulationEngine {
     private final TelemetryBus telemetryBus;
     private final EventBus<SimulationEvent> eventBus;
     private final SimulationLogger logger;
+    private SnapshotRecorder snapshotRecorder;
     private final TickLoop tickLoop;
     private final ExecutorService executorService;
     private final AtomicBoolean running = new AtomicBoolean(false);
@@ -57,6 +59,7 @@ public class SimulationEngine {
     private int regionEndX = -1;
     private int regionEndY = -1;
     private boolean regionActive;
+    private SelectedRegionSnapshotEvent lastRegionSnapshot;
     private long lastRegionEventTick = -SimConfig.LOG_THROTTLE_TICKS;
     private long tickIndex = 0;
 
@@ -72,6 +75,7 @@ public class SimulationEngine {
         this.snapshotBuffer = new SnapshotBuffer(SimConfig.WORLD_W, SimConfig.WORLD_H, SimConfig.MAX_RENDERED_AGENTS);
         this.telemetryBus = telemetryBus;
         this.logger = new SimulationLogger(eventBus, this::getSelectedAgentId);
+        initializeRecorder(mapGenConfig);
         this.tickLoop = new TickLoop(SimConfig.TICK_RATE, this::step);
         this.executorService = Executors.newSingleThreadExecutor(r -> new Thread(r, "sim-tick"));
         writeSnapshot();
@@ -88,6 +92,9 @@ public class SimulationEngine {
         running.set(false);
         tickLoop.stop();
         executorService.shutdownNow();
+        if (snapshotRecorder != null) {
+            snapshotRecorder.close();
+        }
     }
 
     public void pause() {
@@ -114,7 +121,9 @@ public class SimulationEngine {
         regionQueue.clear();
         selectedAgentId = -1;
         regionActive = false;
+        lastRegionSnapshot = null;
         lastRegionEventTick = -SimConfig.LOG_THROTTLE_TICKS;
+        initializeRecorder(newConfig);
         writeSnapshot();
     }
 
@@ -147,6 +156,9 @@ public class SimulationEngine {
         long currentTick = tickIndex;
         if (running.get()) {
             metrics = agents.tick(world, currentTick);
+            if (SimConfig.FOOD_REGEN_PER_TICK > 0f) {
+                world.regenerateFood(SimConfig.FOOD_REGEN_PER_TICK);
+            }
             tickIndex++;
             dirty = true;
             dirty |= ensureSelectionValid(currentTick);
@@ -185,7 +197,11 @@ public class SimulationEngine {
     }
 
     private void emitRegionSnapshot(long currentTick) {
-        if (!SimConfig.LOG_SELECTED_REGION_ENABLED || !regionActive) {
+        if (!regionActive) {
+            return;
+        }
+        boolean shouldEmit = SimConfig.LOG_SELECTED_REGION_ENABLED || snapshotRecorder != null;
+        if (!shouldEmit) {
             return;
         }
         if (currentTick - lastRegionEventTick < SimConfig.LOG_THROTTLE_TICKS) {
@@ -223,6 +239,8 @@ public class SimulationEngine {
         float avgError = count == 0 ? 0f : errorSum / count;
         eventBus.publish(new SelectedRegionSnapshotEvent(minX, minY, maxX, maxY, count, avgEnergy, avgHunger, avgStress,
                 avgError, currentTick));
+        lastRegionSnapshot = new SelectedRegionSnapshotEvent(minX, minY, maxX, maxY, count, avgEnergy, avgHunger, avgStress,
+                avgError, currentTick);
     }
 
     private void writeSnapshot() {
@@ -339,6 +357,9 @@ public class SimulationEngine {
             regionEndX = command.getEndX();
             regionEndY = command.getEndY();
             regionActive = regionStartX >= 0 && regionStartY >= 0 && regionEndX >= 0 && regionEndY >= 0;
+            if (!regionActive) {
+                lastRegionSnapshot = null;
+            }
             changed = true;
         }
         return changed;
@@ -366,6 +387,28 @@ public class SimulationEngine {
                     rule.getTrust(), rule.getUses(), rule.getSuccesses(), rule.getLastUsedTick(), rule.getLastError());
         }
         return new SelectedAgentDetails(agent.getId().value(), agent.getX(), agent.getY(), agent.getAgeTicks(), agent.getEnergy(), agent.getHunger(),
-                agent.getStress(), agent.getPredictionError(), agent.isAwarenessFlag(), views);
+                agent.getStress(), agent.getPredictionError(), agent.isAwarenessFlag(), agent.getFirstNameId(), agent.getSurnameId(),
+                agent.getCultureId(), views);
+    }
+
+    private void initializeRecorder(MapGenConfig mapGenConfig) {
+        if (snapshotRecorder != null) {
+            snapshotRecorder.close();
+        }
+        if (!SimConfig.FILE_LOG_ENABLED) {
+            snapshotRecorder = null;
+            return;
+        }
+        try {
+            snapshotRecorder = new SnapshotRecorder(telemetryBus, this::getLastRegionSnapshot, snapshotBuffer::getLatest, mapGenConfig,
+                    mapGenConfig.getSeed());
+        } catch (Exception e) {
+            e.printStackTrace();
+            snapshotRecorder = null;
+        }
+    }
+
+    private SelectedRegionSnapshotEvent getLastRegionSnapshot() {
+        return lastRegionSnapshot;
     }
 }

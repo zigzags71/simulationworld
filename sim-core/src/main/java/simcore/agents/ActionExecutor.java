@@ -131,7 +131,7 @@ public class ActionExecutor {
                         eatRequests.getTick(requestIndex)));
             }
         }
-        food[tileIndex] = available;
+        food[tileIndex] = Math.max(0f, available);
     }
 
     private static class EatRequestBuffer {

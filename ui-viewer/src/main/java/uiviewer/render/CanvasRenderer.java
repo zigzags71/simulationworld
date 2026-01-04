@@ -28,15 +28,28 @@ public class CanvasRenderer {
         int maxY = camera.getVisibleMaxY(canvas.getHeight());
         int[] cultureColors = buildCultureMap(snapshot, minX, maxX, minY, maxY, snapshot.getWidth());
         double tileSize = camera.getZoom();
+        double overlayAlpha = showAgents ? 0.35 : 1.0;
         for (int y = minY; y <= maxY; y++) {
             double screenY = camera.worldToScreenY(y);
             for (int x = minX; x <= maxX; x++) {
                 int idx = y * snapshot.getWidth() + x;
-                Color color = colorForValue(overlay[idx], mode, cultureColors[idx]);
+                Color color = colorForValue(overlay[idx], mode, cultureColors[idx], overlayAlpha);
                 double screenX = camera.worldToScreenX(x);
                 gc.setFill(color);
                 gc.fillRect(screenX, screenY, tileSize + 0.5, tileSize + 0.5);
             }
+        }
+
+        if (selectionState != null && selectionState.hasRegion()) {
+            gc.setStroke(Color.YELLOW);
+            gc.setLineWidth(1.5);
+            double startX = camera.worldToScreenX(Math.min(selectionState.getRegionStartX(), selectionState.getRegionEndX()));
+            double startY = camera.worldToScreenY(Math.min(selectionState.getRegionStartY(), selectionState.getRegionEndY()));
+            double width = (Math.abs(selectionState.getRegionEndX() - selectionState.getRegionStartX()) + 1) * tileSize;
+            double height = (Math.abs(selectionState.getRegionEndY() - selectionState.getRegionStartY()) + 1) * tileSize;
+            gc.setFill(new Color(1, 1, 0, 0.18));
+            gc.fillRect(startX, startY, width, height);
+            gc.strokeRect(startX, startY, width, height);
         }
 
         if (selectionState != null && selectionState.getSelectedTileX() >= 0) {
@@ -77,13 +90,13 @@ public class CanvasRenderer {
         return culture;
     }
 
-    private Color colorForValue(float value, OverlayMode mode, int cultureColor) {
+    private Color colorForValue(float value, OverlayMode mode, int cultureColor, double alpha) {
         double clamped = Math.max(0.0, Math.min(1.0, value));
         return switch (mode) {
-            case FOOD -> Color.color(0.2 + clamped * 0.8, 0.5 + clamped * 0.5, 0.2, 1.0);
-            case HAZARD -> Color.color(0.4 + clamped * 0.6, 0.2, 0.2 + clamped * 0.8, 1.0);
-            case CROWDING -> Color.color(0.2, 0.2 + clamped * 0.8, 0.8, 1.0);
-            case CULTURE -> cultureColor == 0 ? Color.DARKGRAY : colorFromArgb(cultureColor);
+            case FOOD -> Color.color(0.2 + clamped * 0.8, 0.5 + clamped * 0.5, 0.2, alpha);
+            case HAZARD -> Color.color(0.4 + clamped * 0.6, 0.2, 0.2 + clamped * 0.8, alpha);
+            case CROWDING -> Color.color(0.2, 0.2 + clamped * 0.8, 0.8, alpha);
+            case CULTURE -> cultureColor == 0 ? Color.color(0.15, 0.15, 0.15, alpha) : colorFromArgb(cultureColor).deriveColor(0, 1, 1, alpha);
         };
     }
 
@@ -101,8 +114,7 @@ public class CanvasRenderer {
             if (x < minX || x > maxX || y < minY || y > maxY) {
                 continue;
             }
-            int argb = colors[i];
-            Color color = colorFromArgb(argb).interpolate(Color.WHITE, 0.3);
+            Color color = Color.rgb(0, 255, 0);
             double screenX = camera.worldToScreenX(x);
             double screenY = camera.worldToScreenY(y);
             boolean selected = ids[i] == selectedId;

@@ -8,6 +8,7 @@ import simcore.config.SimConfig;
 import simcore.events.TelemetryBus;
 import simcore.events.TelemetryEvent;
 import simcore.sim.commands.PlaceFieldBrushCommand;
+import simcore.sim.commands.SpawnAgentsCommand;
 import simcore.snapshot.RenderSnapshot;
 import simcore.snapshot.SnapshotBuffer;
 import simcore.util.ColorUtil;
@@ -17,6 +18,7 @@ import simcore.world.WorldGrid;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Random;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -32,6 +34,7 @@ public class SimulationEngine {
     private final AtomicBoolean running = new AtomicBoolean(false);
     private final AtomicBoolean loopStarted = new AtomicBoolean(false);
     private final ConcurrentLinkedQueue<PlaceFieldBrushCommand> brushQueue = new ConcurrentLinkedQueue<>();
+    private final ConcurrentLinkedQueue<SpawnAgentsCommand> spawnQueue = new ConcurrentLinkedQueue<>();
     private MapGenConfig mapGenConfig;
     private long tickIndex = 0;
 
@@ -43,7 +46,7 @@ public class SimulationEngine {
         this.mapGenConfig = mapGenConfig;
         this.world = WorldGrid.generate(mapGenConfig);
         this.agents = new AgentSystem(world, mapGenConfig.getSeed() + 99);
-        this.snapshotBuffer = new SnapshotBuffer(SimConfig.WORLD_W, SimConfig.WORLD_H, SimConfig.NUM_AGENTS);
+        this.snapshotBuffer = new SnapshotBuffer(SimConfig.WORLD_W, SimConfig.WORLD_H, SimConfig.MAX_RENDERED_AGENTS);
         this.telemetryBus = telemetryBus;
         this.tickLoop = new TickLoop(SimConfig.TICK_RATE, this::step);
         this.executorService = Executors.newSingleThreadExecutor(r -> new Thread(r, "sim-tick"));
@@ -82,6 +85,7 @@ public class SimulationEngine {
         this.agents = new AgentSystem(world, newConfig.getSeed() + 99);
         this.tickIndex = 0;
         brushQueue.clear();
+        spawnQueue.clear();
         writeSnapshot();
     }
 
@@ -93,8 +97,13 @@ public class SimulationEngine {
         brushQueue.add(command);
     }
 
+    public void queueSpawnCommand(SpawnAgentsCommand command) {
+        spawnQueue.add(command);
+    }
+
     private void step() {
         boolean dirty = applyBrushCommands();
+        dirty |= applySpawnCommands();
         AgentTickMetrics metrics = null;
         if (running.get()) {
             metrics = agents.tick(world);
@@ -125,7 +134,11 @@ public class SimulationEngine {
         Arrays.fill(back.getAgentCounts(), 0);
         List<AgentState> agentStates = agents.getAgents();
         int index = 0;
+        int capacity = back.getAgentX().length;
         for (AgentState agent : agentStates) {
+            if (index >= capacity) {
+                break;
+            }
             back.getAgentX()[index] = agent.getX();
             back.getAgentY()[index] = agent.getY();
             back.getAgentColorARGB()[index] = ColorUtil.colorFromSeed(agent.getCultureId());
@@ -141,7 +154,7 @@ public class SimulationEngine {
             back.getAgentCounts()[idx] += 1;
             index++;
         }
-        for (int i = index; i < back.getAgentX().length; i++) {
+        for (int i = index; i < capacity; i++) {
             back.getAgentX()[i] = -1;
             back.getAgentY()[i] = -1;
             back.getAgentColorARGB()[i] = 0;
@@ -157,7 +170,7 @@ public class SimulationEngine {
         for (int i = 0; i < back.getCrowding().length; i++) {
             back.getCrowding()[i] = back.getAgentCounts()[i] / 5f;
         }
-        snapshotBuffer.setAgentCount(agentStates.size());
+        snapshotBuffer.setAgentCount(Math.min(agentStates.size(), capacity));
         snapshotBuffer.publish(tickIndex);
     }
 
@@ -173,6 +186,17 @@ public class SimulationEngine {
         while ((command = brushQueue.poll()) != null) {
             changed |= FieldBrushApplier.apply(command, world.getFoodField(), world.getHazardField(), world.getWidth(), world.getHeight(),
                     foodBaseline, hazardBaseline);
+        }
+        return changed;
+    }
+
+    private boolean applySpawnCommands() {
+        boolean changed = false;
+        SpawnAgentsCommand command;
+        while ((command = spawnQueue.poll()) != null) {
+            Random rand = new Random(command.getSeed());
+            int spawned = agents.spawnAgents(world, command.getCenterX(), command.getCenterY(), command.getRadius(), command.getCount(), rand);
+            changed |= spawned > 0;
         }
         return changed;
     }

@@ -20,8 +20,10 @@ import simcore.events.TelemetryBus;
 import simcore.sim.SimulationEngine;
 import simcore.sim.commands.BrushType;
 import simcore.sim.commands.PlaceFieldBrushCommand;
+import simcore.sim.commands.SpawnAgentsCommand;
 import simcore.snapshot.RenderSnapshot;
 import simcore.util.MathUtil;
+import uiviewer.config.UIConfig;
 import uiviewer.render.Camera;
 import uiviewer.render.CanvasRenderer;
 import uiviewer.render.OverlayMode;
@@ -29,28 +31,38 @@ import uiviewer.render.RenderLoop;
 import uiviewer.render.SelectionState;
 import uiviewer.ui.AgentInspectorPanel;
 import uiviewer.ui.MonitorBar;
+import uiviewer.ui.RegionInspectorPanel;
 import uiviewer.ui.TileHoverPanel;
 import java.util.function.Consumer;
 
 public class MainApp extends Application {
+    private enum ToolMode {SELECT, FOOD, HAZARD, ERASE, AGENT}
+
     private SimulationEngine engine;
     private RenderLoop renderLoop;
     private MonitorBar monitorBar;
     private TileHoverPanel tileHoverPanel;
     private AgentInspectorPanel agentInspectorPanel;
+    private RegionInspectorPanel regionInspectorPanel;
     private Camera camera;
     private SelectionState selectionState;
     private boolean panning;
     private double lastPanX;
     private double lastPanY;
     private BrushType currentBrush = BrushType.FOOD;
+    private ToolMode currentTool = ToolMode.SELECT;
     private int brushRadius = 1;
+    private int agentSpawnCount = UIConfig.DEFAULT_AGENT_SPAWN;
+    private boolean painting;
+    private boolean selectingRegion;
+    private long lastPaintMillis;
     private Button startButton;
     private Button pauseResumeButton;
     private Slider foodSlider;
     private Slider hazardSlider;
     private Slider patchinessSlider;
     private Slider waterSlider;
+    private Slider agentSpawnSlider;
     private TextField seedField;
 
     @Override
@@ -61,6 +73,7 @@ public class MainApp extends Application {
         monitorBar = new MonitorBar(telemetryBus);
         tileHoverPanel = new TileHoverPanel();
         agentInspectorPanel = new AgentInspectorPanel();
+        regionInspectorPanel = new RegionInspectorPanel();
         camera = new Camera(SimConfig.WORLD_W, SimConfig.WORLD_H);
         selectionState = new SelectionState();
 
@@ -71,6 +84,7 @@ public class MainApp extends Application {
             public void handle(long now) {
                 super.handle(now);
                 monitorBar.markFrameRendered(now);
+                regionInspectorPanel.update(engine.getLatestSnapshot(), selectionState);
             }
         };
 
@@ -131,8 +145,17 @@ public class MainApp extends Application {
     private VBox buildInspectorPanel() {
         VBox box = new VBox(12);
         box.setPadding(new Insets(8));
-        box.getChildren().addAll(tileHoverPanel, agentInspectorPanel);
+        regionInspectorPanel.setOnClearSelection(() -> {
+            selectionState.clearRegion();
+            selectionState.clearTile();
+            selectionState.clearAgent();
+            tileHoverPanel.clearSelection();
+            agentInspectorPanel.clear();
+            regionInspectorPanel.clear();
+        });
+        box.getChildren().addAll(tileHoverPanel, agentInspectorPanel, regionInspectorPanel);
         VBox.setVgrow(agentInspectorPanel, Priority.ALWAYS);
+        VBox.setVgrow(regionInspectorPanel, Priority.ALWAYS);
         agentInspectorPanel.setPrefHeight(300);
         return box;
     }
@@ -142,10 +165,12 @@ public class MainApp extends Application {
         header.setStyle("-fx-font-weight: bold;");
         seedField = new TextField(String.valueOf(SimConfig.DEFAULT_SEED));
         seedField.setPrefColumnCount(10);
-        VBox foodControl = createSliderControl("Food Richness", SimConfig.DEFAULT_FOOD_RICHNESS, slider -> foodSlider = slider);
-        VBox hazardControl = createSliderControl("Hazard Baseline", SimConfig.DEFAULT_HAZARD_BASELINE, slider -> hazardSlider = slider);
-        VBox patchinessControl = createSliderControl("Patchiness", SimConfig.DEFAULT_PATCHINESS, slider -> patchinessSlider = slider);
-        VBox waterControl = createSliderControl("Water Ratio", SimConfig.DEFAULT_WATER_RATIO, slider -> waterSlider = slider);
+        VBox foodControl = createSliderControl("Food Richness", SimConfig.DEFAULT_FOOD_RICHNESS, slider -> foodSlider = slider, null);
+        VBox hazardControl = createSliderControl("Hazard Baseline", SimConfig.DEFAULT_HAZARD_BASELINE, slider -> hazardSlider = slider, null);
+        VBox patchinessControl = createSliderControl("Patchiness", SimConfig.DEFAULT_PATCHINESS, slider -> patchinessSlider = slider,
+                "Controls blob size/smoothing of generated fields. Higher values create larger contiguous regions; lower values create smaller speckled variation.");
+        VBox waterControl = createSliderControl("Water Ratio", SimConfig.DEFAULT_WATER_RATIO, slider -> waterSlider = slider,
+                "Fraction of tiles generated as water (unwalkable). Higher values create more water/obstacles.");
 
         Button generateButton = new Button("Generate");
         generateButton.setOnAction(e -> regenerateFromUI());
@@ -177,20 +202,31 @@ public class MainApp extends Application {
         Label brushHeader = new Label("Brush");
         brushHeader.setStyle("-fx-font-weight: bold;");
         ToggleGroup typeGroup = new ToggleGroup();
+        ToggleButton select = new ToggleButton("Select");
         ToggleButton food = new ToggleButton("Food Brush");
         ToggleButton hazard = new ToggleButton("Hazard Brush");
         ToggleButton erase = new ToggleButton("Eraser");
+        ToggleButton agent = new ToggleButton("Agent Brush");
+        select.setToggleGroup(typeGroup);
         food.setToggleGroup(typeGroup);
         hazard.setToggleGroup(typeGroup);
         erase.setToggleGroup(typeGroup);
-        food.setSelected(true);
+        agent.setToggleGroup(typeGroup);
+        select.setSelected(true);
         typeGroup.selectedToggleProperty().addListener((obs, old, val) -> {
             if (val == food) {
+                currentTool = ToolMode.FOOD;
                 currentBrush = BrushType.FOOD;
             } else if (val == hazard) {
+                currentTool = ToolMode.HAZARD;
                 currentBrush = BrushType.HAZARD;
             } else if (val == erase) {
+                currentTool = ToolMode.ERASE;
                 currentBrush = BrushType.ERASE;
+            } else if (val == agent) {
+                currentTool = ToolMode.AGENT;
+            } else {
+                currentTool = ToolMode.SELECT;
             }
         });
 
@@ -206,18 +242,42 @@ public class MainApp extends Application {
         medium.setOnAction(e -> brushRadius = 3);
         large.setOnAction(e -> brushRadius = 7);
 
-        HBox typeRow = new HBox(6, food, hazard, erase);
+        Label spawnLabel = new Label("Spawn per spray");
+        Label spawnValue = new Label(String.valueOf(agentSpawnCount));
+        agentSpawnSlider = new Slider(UIConfig.MIN_AGENT_SPAWN, UIConfig.MAX_AGENT_SPAWN, UIConfig.DEFAULT_AGENT_SPAWN);
+        agentSpawnSlider.setMajorTickUnit(5);
+        agentSpawnSlider.setMinorTickCount(4);
+        agentSpawnSlider.setBlockIncrement(1);
+        agentSpawnSlider.setSnapToTicks(true);
+        agentSpawnSlider.valueProperty().addListener((obs, old, val) -> {
+            agentSpawnCount = val.intValue();
+            spawnValue.setText(String.valueOf(agentSpawnCount));
+        });
+        agentSpawnSlider.disableProperty().bind(agent.selectedProperty().not());
+
+        VBox spawnBox = new VBox(4, spawnLabel, agentSpawnSlider, spawnValue);
+
+        HBox typeRow = new HBox(6, select, food, hazard);
+        HBox typeRow2 = new HBox(6, agent, erase);
         HBox sizeRow = new HBox(6, small, medium, large);
         typeRow.setAlignment(Pos.CENTER_LEFT);
+        typeRow2.setAlignment(Pos.CENTER_LEFT);
         sizeRow.setAlignment(Pos.CENTER_LEFT);
-        VBox box = new VBox(6, brushHeader, new Label("Tool"), typeRow, new Label("Size"), sizeRow);
+        VBox box = new VBox(6, brushHeader, new Label("Tool"), typeRow, typeRow2, new Label("Size"), sizeRow, spawnBox);
         return box;
     }
 
-    private VBox createSliderControl(String label, double initial, Consumer<Slider> assign) {
+    private VBox createSliderControl(String label, double initial, Consumer<Slider> assign, String tooltip) {
         Label caption = new Label(label);
+        if (tooltip != null && !tooltip.isEmpty()) {
+            Tooltip tip = new Tooltip(tooltip);
+            caption.setTooltip(tip);
+        }
         Label valueLabel = new Label(String.format("%.2f", initial));
         Slider slider = new Slider(0, 1, initial);
+        if (tooltip != null && !tooltip.isEmpty()) {
+            slider.setTooltip(new Tooltip(tooltip));
+        }
         slider.setMajorTickUnit(0.25);
         slider.setBlockIncrement(0.01);
         slider.valueProperty().addListener((obs, old, val) -> valueLabel.setText(String.format("%.2f", val.doubleValue())));
@@ -235,10 +295,9 @@ public class MainApp extends Application {
 
     private void attachInteractionHandlers(Canvas canvas) {
         canvas.addEventHandler(MouseEvent.MOUSE_MOVED, this::updateHover);
-        canvas.addEventHandler(MouseEvent.MOUSE_CLICKED, this::handleClick);
-        canvas.addEventHandler(MouseEvent.MOUSE_PRESSED, this::beginPan);
-        canvas.addEventHandler(MouseEvent.MOUSE_DRAGGED, this::dragPan);
-        canvas.addEventHandler(MouseEvent.MOUSE_RELEASED, e -> panning = false);
+        canvas.addEventHandler(MouseEvent.MOUSE_PRESSED, this::handlePress);
+        canvas.addEventHandler(MouseEvent.MOUSE_DRAGGED, this::handleDrag);
+        canvas.addEventHandler(MouseEvent.MOUSE_RELEASED, this::handleRelease);
         canvas.addEventHandler(ScrollEvent.SCROLL, this::handleScroll);
     }
 
@@ -255,7 +314,13 @@ public class MainApp extends Application {
                 snapshot.getAgentCounts()[idx]);
     }
 
-    private void handleClick(MouseEvent event) {
+    private void handlePress(MouseEvent event) {
+        if (event.getButton() == MouseButton.SECONDARY || event.getButton() == MouseButton.MIDDLE) {
+            panning = true;
+            lastPanX = event.getX();
+            lastPanY = event.getY();
+            return;
+        }
         if (event.getButton() != MouseButton.PRIMARY) {
             return;
         }
@@ -266,35 +331,57 @@ public class MainApp extends Application {
         int[] coords = toTile(event.getX(), event.getY(), snapshot);
         int tileX = coords[0];
         int tileY = coords[1];
-        int idx = MathUtil.index(tileX, tileY, snapshot.getWidth());
-        selectionState.setSelectedTile(tileX, tileY);
-        tileHoverPanel.updateSelection(tileX, tileY, snapshot.getFood()[idx], snapshot.getHazard()[idx], snapshot.getCrowding()[idx],
-                snapshot.getAgentCounts()[idx]);
-        engine.queueBrushCommand(new PlaceFieldBrushCommand(currentBrush, tileX, tileY, brushRadius, System.nanoTime()));
-        double worldX = camera.screenToWorldX(event.getX());
-        double worldY = camera.screenToWorldY(event.getY());
-        long closestId = findAgentAt(snapshot, tileX, tileY, worldX, worldY);
-        selectionState.setSelectedAgentId(closestId);
-        agentInspectorPanel.update(snapshot, closestId);
+        if (currentTool == ToolMode.SELECT) {
+            selectingRegion = true;
+            selectionState.beginRegion(tileX, tileY);
+            selectionState.setSelectedTile(tileX, tileY);
+        } else {
+            startPainting(tileX, tileY);
+        }
     }
 
-    private void beginPan(MouseEvent event) {
-        if (event.getButton() == MouseButton.SECONDARY || event.getButton() == MouseButton.MIDDLE) {
-            panning = true;
+    private void handleDrag(MouseEvent event) {
+        if (panning && (event.isSecondaryButtonDown() || event.isMiddleButtonDown())) {
+            double dx = event.getX() - lastPanX;
+            double dy = event.getY() - lastPanY;
+            camera.pan(dx, dy);
             lastPanX = event.getX();
             lastPanY = event.getY();
+            return;
+        }
+        RenderSnapshot snapshot = engine.getLatestSnapshot();
+        if (snapshot == null) {
+            return;
+        }
+        int[] coords = toTile(event.getX(), event.getY(), snapshot);
+        int tileX = coords[0];
+        int tileY = coords[1];
+        if (selectingRegion && event.isPrimaryButtonDown()) {
+            selectionState.updateRegionEnd(tileX, tileY);
+            regionInspectorPanel.update(snapshot, selectionState);
+        } else if (painting && event.isPrimaryButtonDown()) {
+            applyBrushIfDue(tileX, tileY);
         }
     }
 
-    private void dragPan(MouseEvent event) {
-        if (!panning) {
+    private void handleRelease(MouseEvent event) {
+        if (event.getButton() == MouseButton.SECONDARY || event.getButton() == MouseButton.MIDDLE) {
+            panning = false;
             return;
         }
-        double dx = event.getX() - lastPanX;
-        double dy = event.getY() - lastPanY;
-        camera.pan(dx, dy);
-        lastPanX = event.getX();
-        lastPanY = event.getY();
+        RenderSnapshot snapshot = engine.getLatestSnapshot();
+        if (snapshot != null) {
+            int[] coords = toTile(event.getX(), event.getY(), snapshot);
+            int tileX = coords[0];
+            int tileY = coords[1];
+            if (selectingRegion) {
+                selectionState.updateRegionEnd(tileX, tileY);
+                updateSelectionPanels(snapshot, tileX, tileY, event);
+                regionInspectorPanel.update(snapshot, selectionState);
+            }
+        }
+        selectingRegion = false;
+        painting = false;
     }
 
     private void handleScroll(ScrollEvent event) {
@@ -302,6 +389,43 @@ public class MainApp extends Application {
         double width = extractCanvasWidth(event);
         double height = extractCanvasHeight(event);
         camera.zoomAt(factor, event.getX(), event.getY(), width, height);
+    }
+
+    private void startPainting(int tileX, int tileY) {
+        painting = true;
+        lastPaintMillis = 0;
+        applyBrushIfDue(tileX, tileY);
+    }
+
+    private void applyBrushIfDue(int tileX, int tileY) {
+        long now = System.currentTimeMillis();
+        if (now - lastPaintMillis < UIConfig.BRUSH_INTERVAL_MS) {
+            return;
+        }
+        lastPaintMillis = now;
+        if (currentTool == ToolMode.AGENT) {
+            engine.queueSpawnCommand(new SpawnAgentsCommand(tileX, tileY, brushRadius, agentSpawnCount, System.nanoTime()));
+            return;
+        }
+        BrushType type = switch (currentTool) {
+            case FOOD -> BrushType.FOOD;
+            case HAZARD -> BrushType.HAZARD;
+            case ERASE -> BrushType.ERASE;
+            default -> currentBrush;
+        };
+        engine.queueBrushCommand(new PlaceFieldBrushCommand(type, tileX, tileY, brushRadius, System.nanoTime()));
+    }
+
+    private void updateSelectionPanels(RenderSnapshot snapshot, int tileX, int tileY, MouseEvent event) {
+        int idx = MathUtil.index(tileX, tileY, snapshot.getWidth());
+        selectionState.setSelectedTile(tileX, tileY);
+        tileHoverPanel.updateSelection(tileX, tileY, snapshot.getFood()[idx], snapshot.getHazard()[idx], snapshot.getCrowding()[idx],
+                snapshot.getAgentCounts()[idx]);
+        double worldX = camera.screenToWorldX(event.getX());
+        double worldY = camera.screenToWorldY(event.getY());
+        long closestId = findAgentAt(snapshot, tileX, tileY, worldX, worldY);
+        selectionState.setSelectedAgentId(closestId);
+        agentInspectorPanel.update(snapshot, closestId);
     }
 
     private double extractCanvasWidth(ScrollEvent event) {
@@ -360,8 +484,10 @@ public class MainApp extends Application {
         engine.regenerate(config);
         selectionState.clearTile();
         selectionState.clearAgent();
+        selectionState.clearRegion();
         tileHoverPanel.clearSelection();
         agentInspectorPanel.clear();
+        regionInspectorPanel.clear();
         startButton.setDisable(false);
         pauseResumeButton.setText("Resume");
     }

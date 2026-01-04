@@ -14,30 +14,20 @@ public class AgentSystem {
     private final MovementPolicy movementPolicy;
     private final NourishmentPolicy nourishmentPolicy;
     private final Random random;
+    private long nextId;
     private int totalDeaths;
 
     public AgentSystem(WorldGrid world, long seed) {
-        this.random = new Random(seed);
-        this.agents = new ArrayList<>(SimConfig.NUM_AGENTS);
-        this.movementPolicy = new RandomWalkMovement(seed + 7);
-        this.nourishmentPolicy = new BasicNourishmentPolicy();
-        spawnAgents(world);
+        this(world, seed, SimConfig.NUM_AGENTS);
     }
 
-    private void spawnAgents(WorldGrid world) {
-        int w = world.getWidth();
-        int h = world.getHeight();
-        boolean[] water = world.getWaterMask();
-        int spawned = 0;
-        while (spawned < SimConfig.NUM_AGENTS) {
-            int x = random.nextInt(w);
-            int y = random.nextInt(h);
-            if (!water[MathUtil.index(x, y, w)]) {
-                AgentState agent = new AgentState(new AgentId(spawned), x, y, SimConfig.INITIAL_ENERGY, 0);
-                agents.add(agent);
-                spawned++;
-            }
-        }
+    public AgentSystem(WorldGrid world, long seed, int initialPopulation) {
+        this.random = new Random(seed);
+        this.agents = new ArrayList<>(Math.max(initialPopulation, 16));
+        this.movementPolicy = new RandomWalkMovement(seed + 7);
+        this.nourishmentPolicy = new BasicNourishmentPolicy();
+        this.nextId = 0;
+        spawnInitialAgents(world, initialPopulation);
     }
 
     public AgentTickMetrics tick(WorldGrid world) {
@@ -65,6 +55,64 @@ public class AgentSystem {
         }
         metrics.setTotalDeaths(totalDeaths);
         return metrics;
+    }
+
+    private void spawnInitialAgents(WorldGrid world, int initialPopulation) {
+        int w = world.getWidth();
+        int h = world.getHeight();
+        boolean[] water = world.getWaterMask();
+        int spawned = 0;
+        while (spawned < initialPopulation) {
+            int x = random.nextInt(w);
+            int y = random.nextInt(h);
+            if (!water[MathUtil.index(x, y, w)]) {
+                AgentState agent = new AgentState(new AgentId(nextId++), x, y, SimConfig.INITIAL_ENERGY, spawned);
+                agents.add(agent);
+                spawned++;
+            }
+        }
+    }
+
+    public int spawnAgents(WorldGrid world, int centerX, int centerY, int radius, int count, Random rand) {
+        if (count <= 0 || radius <= 0) {
+            return 0;
+        }
+        int width = world.getWidth();
+        int height = world.getHeight();
+        boolean[] water = world.getWaterMask();
+        int minX = Math.max(0, centerX - radius);
+        int maxX = Math.min(width - 1, centerX + radius);
+        int minY = Math.max(0, centerY - radius);
+        int maxY = Math.min(height - 1, centerY + radius);
+        int radiusSq = radius * radius;
+        List<Integer> candidates = new ArrayList<>();
+        for (int y = minY; y <= maxY; y++) {
+            for (int x = minX; x <= maxX; x++) {
+                int dx = x - centerX;
+                int dy = y - centerY;
+                if (dx * dx + dy * dy <= radiusSq) {
+                    int idx = MathUtil.index(x, y, width);
+                    if (!water[idx]) {
+                        candidates.add(idx);
+                    }
+                }
+            }
+        }
+        if (candidates.isEmpty()) {
+            return 0;
+        }
+        Collections.shuffle(candidates, rand);
+        int spawned = 0;
+        int cultureBase = rand.nextInt(Integer.MAX_VALUE);
+        for (int i = 0; i < candidates.size() && spawned < count; i++) {
+            int idx = candidates.get(i);
+            int x = idx % width;
+            int y = idx / width;
+            AgentState agent = new AgentState(new AgentId(nextId++), x, y, SimConfig.INITIAL_ENERGY, cultureBase + spawned);
+            agents.add(agent);
+            spawned++;
+        }
+        return spawned;
     }
 
     public List<AgentState> getAgents() {

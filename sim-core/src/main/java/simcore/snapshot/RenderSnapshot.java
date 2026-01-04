@@ -23,12 +23,13 @@ public class RenderSnapshot {
     private final int[] agentCounts;
     private final int agentCount;
     private final long tickIndex;
+    private final SelectedAgentDetails selectedAgentDetails;
 
     public RenderSnapshot(int width, int height, float[] food, float[] hazard, float[] crowding,
                           int[] agentX, int[] agentY, int[] agentColorARGB, long[] agentId,
                           int[] agentAge, float[] agentEnergy, float[] agentHunger, float[] agentStress,
                           float[] agentPredictionError, boolean[] agentAwareness, int[] agentCultureId,
-                          int[] agentCounts, int agentCount, long tickIndex) {
+                          int[] agentCounts, int agentCount, long tickIndex, SelectedAgentDetails selectedAgentDetails) {
         this.width = width;
         this.height = height;
         this.food = food;
@@ -48,6 +49,7 @@ public class RenderSnapshot {
         this.agentCounts = agentCounts;
         this.agentCount = agentCount;
         this.tickIndex = tickIndex;
+        this.selectedAgentDetails = selectedAgentDetails;
     }
 
     public int getWidth() {
@@ -124,5 +126,9 @@ public class RenderSnapshot {
 
     public long getTickIndex() {
         return tickIndex;
+    }
+
+    public SelectedAgentDetails getSelectedAgentDetails() {
+        return selectedAgentDetails;
     }
 }

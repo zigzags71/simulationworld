@@ -16,6 +16,7 @@ import simcore.util.MathUtil;
 import simcore.naming.NameGenerator;
 import simcore.naming.NameGenerator.NameRecord;
 import simcore.world.WorldGrid;
+import simcore.world.objects.FoodEmitter;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -206,6 +207,10 @@ public class AgentSystem {
         return Collections.unmodifiableList(agents);
     }
 
+    public int getTotalDeaths() {
+        return totalDeaths;
+    }
+
     public AgentState findAgentById(long id) {
         for (AgentState agent : agents) {
             if (agent.getId().value() == id) {
@@ -235,7 +240,20 @@ public class AgentSystem {
         float crowdNorm = Math.min(1f, crowding[idx] / SimConfig.CROWDING_MAX_EXPECTED);
         int crowdBin = BinningUtil.bin01(crowdNorm, bins);
         int awareness = 0;
-        int affordance = world.getFoodField()[idx] >= SimConfig.FOOD_MIN_TO_EAT ? 1 : 0;
+        int affordance = 0;
+        if (world.getFoodField()[idx] >= SimConfig.FOOD_MIN_TO_EAT) {
+            affordance |= 1;
+        }
+        int pickupRadius = SimConfig.SIGNAL_PICKUP_RADIUS_BASE + (int) (agent.getStress() * 2);
+        if (world.getSignalField().hasSignalWithinRadius(agent.getX(), agent.getY(), pickupRadius)) {
+            affordance |= 1 << 1;
+        }
+        for (FoodEmitter emitter : world.getEmittersView()) {
+            if (Math.abs(emitter.getX() - agent.getX()) <= 2 && Math.abs(emitter.getY() - agent.getY()) <= 2) {
+                affordance |= 1 << 2;
+                break;
+            }
+        }
         return new ContextKey(hungerBin, energyBin, stressBin, foodBin, hazardBin, crowdBin, awareness, affordance);
     }
 
@@ -247,9 +265,17 @@ public class AgentSystem {
                 -SimConfig.HUNGER_DRAIN_PER_TICK - SimConfig.MOVE_HUNGER_COST, -SimConfig.STRESS_RECOVERY_PER_TICK);
         OutcomeVector eatExpected = new OutcomeVector(SimConfig.FOOD_TO_ENERGY_GAIN * SimConfig.FOOD_CONSUME_RATE,
                 SimConfig.FOOD_TO_HUNGER_GAIN * SimConfig.FOOD_CONSUME_RATE, -SimConfig.STRESS_RECOVERY_PER_TICK * 0.5f);
+        OutcomeVector broadcastExpected = new OutcomeVector(-SimConfig.SIGNAL_BROADCAST_COST_ENERGY,
+                -SimConfig.SIGNAL_BROADCAST_COST_HUNGER, 0f);
+        OutcomeVector followExpected = new OutcomeVector(-SimConfig.ENERGY_DRAIN_PER_TICK - SimConfig.MOVE_ENERGY_COST,
+                -SimConfig.HUNGER_DRAIN_PER_TICK - SimConfig.MOVE_HUNGER_COST, -SimConfig.STRESS_RECOVERY_PER_TICK);
         agent.addRule(new Rule(agent.allocateRuleId(), RuleType.NORMAL, contextKey, ActionType.IDLE, idleExpected, 0.8f));
         agent.addRule(new Rule(agent.allocateRuleId(), RuleType.NORMAL, contextKey, ActionType.MOVE, moveExpected, 0.5f));
         agent.addRule(new Rule(agent.allocateRuleId(), RuleType.NORMAL, contextKey, ActionType.EAT, eatExpected, 0.5f));
+        agent.addRule(new Rule(agent.allocateRuleId(), RuleType.NORMAL, contextKey, ActionType.BROADCAST_SIGNAL,
+                broadcastExpected, 0.15f));
+        agent.addRule(new Rule(agent.allocateRuleId(), RuleType.NORMAL, contextKey, ActionType.FOLLOW_SIGNAL, followExpected,
+                0.2f));
     }
 
     void applyTrustUpdate(Rule rule, float error, long tickIndex) {

@@ -38,6 +38,11 @@ public final class SimConfig {
     public static final float FOOD_TO_HUNGER_GAIN = 0.8f;
     public static final float FOOD_TO_ENERGY_GAIN = 0.3f;
 
+    public static final int EMITTER_RADIUS_MAX = 50;
+    public static final int EMITTER_DEFAULT_RADIUS = 6;
+    public static final float EMITTER_DEFAULT_STRENGTH = 0.02f;
+    public static final boolean EMITTER_PLACEMENT_ENABLED = true;
+
     public static final float RULE_MATCH_DISTANCE = 1.0f;
     public static final float TRUST_ALPHA = 2.0f;
     public static final float TRUST_EPSILON = 0.05f;
@@ -56,6 +61,19 @@ public final class SimConfig {
 
     public static final float CROWDING_MAX_EXPECTED = 6f;
 
+    public static final int SIGNAL_TTL_TICKS = 600;
+    public static final int SIGNAL_PICKUP_RADIUS_BASE = 6;
+    public static final int SIGNAL_SENSE_RADIUS_BASE = 12;
+    public static final int SIGNAL_SENSE_RADIUS_MAX = 200;
+    public static final float SIGNAL_RELAY_TRUST_THRESHOLD = 0.65f;
+    public static final int SIGNAL_VERIFY_WINDOW_TICKS = 80;
+    public static final float SIGNAL_BROADCAST_COST_ENERGY = 0.01f;
+    public static final float SIGNAL_BROADCAST_COST_HUNGER = 0.005f;
+    public static final float SIGNAL_BASE_CONFIDENCE = 0.25f;
+    public static final float SIGNAL_VERIFIED_CONFIDENCE = 0.75f;
+    public static final float SIGNAL_RELAY_CONFIDENCE = 0.55f;
+    public static final int SIGNAL_STRENGTH_BINS = FIELD_BIN_COUNT;
+
     public static boolean LOG_EVENTS_ENABLED = false;
     public static boolean LOG_SELECTED_AGENT_ENABLED = false;
     public static boolean LOG_SELECTED_REGION_ENABLED = false;
@@ -64,6 +82,7 @@ public final class SimConfig {
     public static String LOG_DIR = "./logs";
     public static int SUMMARY_INTERVAL_TICKS = 20;
     public static int SELECTION_INTERVAL_TICKS = 20;
+    public static final int MAX_EMITTERS_RENDERED = 2048;
 
     private SimConfig() {
     }

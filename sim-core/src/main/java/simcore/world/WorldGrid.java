@@ -3,7 +3,12 @@ package simcore.world;
 import simcore.config.MapGenConfig;
 import simcore.config.SimConfig;
 import simcore.util.MathUtil;
+import simcore.world.objects.FoodEmitter;
+import simcore.world.signals.SignalField;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Random;
 
 /**
@@ -15,6 +20,9 @@ public class WorldGrid {
     private final float[] foodStock;
     private final float[] hazardField;
     private final boolean[] waterMask;
+    private final List<FoodEmitter> emitters;
+    private long nextEmitterId = 1;
+    private final SignalField signalField;
 
     private final long seed;
 
@@ -25,6 +33,8 @@ public class WorldGrid {
         this.foodStock = foodField;
         this.hazardField = hazardField;
         this.waterMask = waterMask;
+        this.emitters = new ArrayList<>();
+        this.signalField = new SignalField(width, height);
     }
 
     public static WorldGrid generate(long seed) {
@@ -142,6 +152,10 @@ public class WorldGrid {
         return seed;
     }
 
+    public SignalField getSignalField() {
+        return signalField;
+    }
+
     public void regenerateFood(float amountPerTile) {
         if (amountPerTile <= 0f) {
             return;
@@ -149,6 +163,102 @@ public class WorldGrid {
         for (int i = 0; i < foodStock.length; i++) {
             float next = foodStock[i] + amountPerTile;
             foodStock[i] = Math.min(next, SimConfig.TILE_FOOD_MAX);
+        }
+    }
+
+    public List<FoodEmitter> getEmittersView() {
+        return Collections.unmodifiableList(emitters);
+    }
+
+    public FoodEmitter addEmitter(int x, int y, int radius, float strength, boolean enabled) {
+        FoodEmitter emitter = new FoodEmitter(nextEmitterId++, x, y, radius, strength, enabled);
+        emitters.add(emitter);
+        emitters.sort((a, b) -> Long.compare(a.getId(), b.getId()));
+        return emitter;
+    }
+
+    public boolean removeEmitterAt(int x, int y) {
+        FoodEmitter emitter = findEmitterAt(x, y);
+        if (emitter == null) {
+            return false;
+        }
+        return emitters.remove(emitter);
+    }
+
+    public FoodEmitter findEmitterAt(int x, int y) {
+        FoodEmitter best = null;
+        for (FoodEmitter emitter : emitters) {
+            if (emitter.getX() == x && emitter.getY() == y) {
+                if (best == null || emitter.getId() < best.getId()) {
+                    best = emitter;
+                }
+            }
+        }
+        return best;
+    }
+
+    public void updateEmitter(long id, Integer radius, Float strength, Boolean enabled) {
+        for (FoodEmitter emitter : emitters) {
+            if (emitter.getId() == id) {
+                if (radius != null) {
+                    emitter.setRadius(radius);
+                }
+                if (strength != null) {
+                    emitter.setStrengthPerTick(strength);
+                }
+                if (enabled != null) {
+                    emitter.setEnabled(enabled);
+                }
+                return;
+            }
+        }
+    }
+
+    public void tickEmitters() {
+        for (FoodEmitter emitter : emitters) {
+            if (!emitter.isEnabled()) {
+                continue;
+            }
+            depositEmitter(emitter);
+        }
+    }
+
+    private void depositEmitter(FoodEmitter emitter) {
+        int r = emitter.getRadius();
+        int cx = emitter.getX();
+        int cy = emitter.getY();
+        float strength = emitter.getStrengthPerTick();
+        if (r < 0 || strength <= 0f) {
+            return;
+        }
+        int minX = Math.max(0, cx - r);
+        int maxX = Math.min(width - 1, cx + r);
+        int minY = Math.max(0, cy - r);
+        int maxY = Math.min(height - 1, cy + r);
+        int rSq = r * r;
+        for (int dy = -r; dy <= r; dy++) {
+            int y = cy + dy;
+            if (y < 0 || y >= height) {
+                continue;
+            }
+            for (int dx = -r; dx <= r; dx++) {
+                int x = cx + dx;
+                if (x < 0 || x >= width) {
+                    continue;
+                }
+                if (dx * dx + dy * dy > rSq) {
+                    continue;
+                }
+                int idx = index(x, y, width);
+                if (waterMask[idx]) {
+                    continue;
+                }
+                float dist = (float) Math.sqrt(dx * dx + dy * dy);
+                float w = r == 0 ? 1f : Math.max(0f, 1f - (dist / r));
+                float add = strength * w;
+                float next = Math.min(SimConfig.TILE_FOOD_MAX, foodStock[idx] + add);
+                foodStock[idx] = next;
+            }
         }
     }
 }

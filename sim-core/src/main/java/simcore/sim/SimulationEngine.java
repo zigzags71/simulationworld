@@ -155,6 +155,8 @@ public class SimulationEngine {
         AgentTickMetrics metrics = null;
         long currentTick = tickIndex;
         if (running.get()) {
+            world.tickEmitters();
+            world.getSignalField().tickDecay();
             metrics = agents.tick(world, currentTick);
             if (SimConfig.FOOD_REGEN_PER_TICK > 0f) {
                 world.regenerateFood(SimConfig.FOOD_REGEN_PER_TICK);

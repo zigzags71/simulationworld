@@ -23,6 +23,9 @@ public class AgentState {
     private int cultureId;
     private final List<Rule> rulebook;
     private long nextRuleId;
+    private long lastFollowSignalId = -1;
+    private long lastFollowRuleId = -1;
+    private long lastFollowTick = -1;
 
     public AgentState(AgentId id, int x, int y, float energy, int firstNameId, int surnameId, int cultureId) {
         this.id = id;
@@ -105,6 +108,30 @@ public class AgentState {
 
     public void addRule(Rule rule) {
         this.rulebook.add(rule);
+    }
+
+    public long getLastFollowSignalId() {
+        return lastFollowSignalId;
+    }
+
+    public long getLastFollowRuleId() {
+        return lastFollowRuleId;
+    }
+
+    public long getLastFollowTick() {
+        return lastFollowTick;
+    }
+
+    public void setFollowMemory(long signalId, long ruleId, long tick) {
+        this.lastFollowSignalId = signalId;
+        this.lastFollowRuleId = ruleId;
+        this.lastFollowTick = tick;
+    }
+
+    public void clearFollowMemory() {
+        this.lastFollowSignalId = -1;
+        this.lastFollowRuleId = -1;
+        this.lastFollowTick = -1;
     }
 
     public long allocateRuleId() {

@@ -38,6 +38,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 public class SimulationEngine {
     private WorldGrid world;
@@ -51,6 +52,7 @@ public class SimulationEngine {
     private final ExecutorService executorService;
     private final AtomicBoolean running = new AtomicBoolean(false);
     private final AtomicBoolean loopStarted = new AtomicBoolean(false);
+    private final AtomicReference<RenderSnapshot> latestSnapshot = new AtomicReference<>();
     private final ConcurrentLinkedQueue<PlaceFieldBrushCommand> brushQueue = new ConcurrentLinkedQueue<>();
     private final ConcurrentLinkedQueue<PlaceEmitterCommand> emitterPlaceQueue = new ConcurrentLinkedQueue<>();
     private final ConcurrentLinkedQueue<RemoveEmitterCommand> emitterRemoveQueue = new ConcurrentLinkedQueue<>();
@@ -111,7 +113,7 @@ public class SimulationEngine {
     }
 
     public RenderSnapshot getLatestSnapshot() {
-        return snapshotBuffer.getLatest();
+        return latestSnapshot.get();
     }
 
     public void regenerate(MapGenConfig newConfig) {
@@ -162,7 +164,7 @@ public class SimulationEngine {
         regionQueue.add(command);
     }
 
-    private void step() {
+    public void step() {
         boolean dirty = applyBrushCommands();
         dirty |= applyEmitterCommands();
         dirty |= applySpawnCommands();
@@ -340,6 +342,7 @@ public class SimulationEngine {
         snapshotBuffer.setEmitterCount(emitterIndex);
         snapshotBuffer.setSelectedAgentDetails(selectedDetails);
         snapshotBuffer.publish(tickIndex);
+        latestSnapshot.set(snapshotBuffer.getLatest());
     }
 
     public TelemetryBus getTelemetryBus() {

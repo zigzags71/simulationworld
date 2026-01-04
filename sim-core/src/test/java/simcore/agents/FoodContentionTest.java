@@ -43,7 +43,7 @@ class FoodContentionTest {
         AgentSystem system = new AgentSystem(world, seed, 0, null);
         system.spawnAgents(world, 0, 0, 1, 2, new Random(1));
 
-        Map<Long, Float> hungerBeforeTick = new HashMap<>();
+        Map<AgentId, Float> hungerBeforeTick = new HashMap<>();
         for (AgentState agent : system.getAgents()) {
             agent.moveTo(0, 0);
             agent.applyTick(0f, -0.9f, 0f);

@@ -1,5 +1,6 @@
 package uiviewer.ui;
 
+import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.scene.control.Label;
 import javafx.scene.layout.HBox;
@@ -17,7 +18,7 @@ public class MonitorBar extends HBox {
         setSpacing(16);
         setPadding(new Insets(8));
         getChildren().addAll(tickLabel, populationLabel, predictionLabel, fpsLabel);
-        telemetryBus.subscribe(this::onTelemetry);
+        telemetryBus.subscribe(event -> Platform.runLater(() -> onTelemetry(event)));
     }
 
     private void onTelemetry(TelemetryEvent event) {

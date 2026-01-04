@@ -5,6 +5,8 @@ import javafx.scene.control.ListView;
 import javafx.scene.layout.VBox;
 import simcore.agents.AgentState;
 
+import java.util.Collections;
+
 public class AgentInspectorPanel extends VBox {
     private final Label idLabel = new Label("Agent: none");
     private final Label positionLabel = new Label("Position: --");
@@ -48,6 +50,6 @@ public class AgentInspectorPanel extends VBox {
         stressLabel.setText(String.format("Stress: %.3f", agent.getStress()));
         predictionErrorLabel.setText(String.format("Prediction Error: %.3f", agent.getPredictionError()));
         awarenessLabel.setText("Awareness: " + agent.isAwarenessFlag());
-        rulesList.getItems().setAll();
+        rulesList.getItems().setAll(Collections.emptyList());
     }
 }

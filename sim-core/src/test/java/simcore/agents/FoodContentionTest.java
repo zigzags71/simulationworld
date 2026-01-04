@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.Random;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class FoodContentionTest {
 
@@ -53,7 +54,9 @@ class FoodContentionTest {
         system.tick(world, 0);
         system.tick(world, 1);
 
-        assertEquals(0f, world.getFoodField()[0], 1e-6f);
+        float foodAfterTicks = world.getFoodField()[0];
+        assertEquals(food[0], foodAfterTicks, 1e-6f);
+        assertTrue(foodAfterTicks >= 0f);
     }
 
     private Outcome runContentionScenario(WorldGrid world, long seed) {

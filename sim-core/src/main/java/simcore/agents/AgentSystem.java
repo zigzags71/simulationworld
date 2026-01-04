@@ -55,6 +55,17 @@ public class AgentSystem {
 
     public AgentTickMetrics tick(WorldGrid world, long tickIndex) {
         AgentTickMetrics metrics = new AgentTickMetrics();
+        for (int i = agents.size() - 1; i >= 0; i--) {
+            AgentState agent = agents.get(i);
+            if (agent != null && agent.isDead()) {
+                agents.remove(i);
+                totalDeaths++;
+                metrics.markDeath();
+                if (eventBus != null && SimConfig.LOG_EVENTS_ENABLED) {
+                    eventBus.publish(new AgentDiedEvent(agent.getId().value(), tickIndex, agent.getX(), agent.getY()));
+                }
+            }
+        }
         int width = world.getWidth();
         int[] crowding = computeCrowding(width, world.getHeight());
         int agentCount = agents.size();

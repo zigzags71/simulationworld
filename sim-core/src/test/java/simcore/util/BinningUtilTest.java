@@ -23,4 +23,9 @@ class BinningUtilTest {
     void rejectsInvalidBinCounts() {
         assertThrows(IllegalArgumentException.class, () -> BinningUtil.toBin(0.1f, 0));
     }
+
+    @Test
+    void distributesUpperEdgeIntoLastBin() {
+        assertEquals(4, BinningUtil.toBin(1f, 5));
+    }
 }

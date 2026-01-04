@@ -3,7 +3,7 @@ package uiviewer.ui;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
 import javafx.scene.layout.VBox;
-import simcore.agents.AgentState;
+import simcore.snapshot.RenderSnapshot;
 
 import java.util.Collections;
 
@@ -20,7 +20,7 @@ public class AgentInspectorPanel extends VBox {
 
     public AgentInspectorPanel() {
         setSpacing(4);
-        rulesList.setPlaceholder(new Label("Rules pending implementation"));
+        rulesList.setPlaceholder(new Label("No rules recorded (v0.2)"));
         getChildren().addAll(idLabel, positionLabel, ageLabel, energyLabel, hungerLabel, stressLabel,
                 predictionErrorLabel, awarenessLabel, new Label("Rules"), rulesList);
     }
@@ -37,19 +37,30 @@ public class AgentInspectorPanel extends VBox {
         rulesList.getItems().clear();
     }
 
-    public void update(AgentState agent) {
-        if (agent == null) {
+    public void update(RenderSnapshot snapshot, long agentId) {
+        if (snapshot == null || agentId < 0) {
             clear();
             return;
         }
-        idLabel.setText("Agent: " + agent.getId().value());
-        positionLabel.setText("Position: (" + agent.getX() + ", " + agent.getY() + ")");
-        ageLabel.setText("Age: " + agent.getAge());
-        energyLabel.setText(String.format("Energy: %.3f", agent.getEnergy()));
-        hungerLabel.setText(String.format("Hunger: %.3f", agent.getHunger()));
-        stressLabel.setText(String.format("Stress: %.3f", agent.getStress()));
-        predictionErrorLabel.setText(String.format("Prediction Error: %.3f", agent.getPredictionError()));
-        awarenessLabel.setText("Awareness: " + agent.isAwarenessFlag());
+        int foundIndex = -1;
+        for (int i = 0; i < snapshot.getAgentCount(); i++) {
+            if (snapshot.getAgentId()[i] == agentId) {
+                foundIndex = i;
+                break;
+            }
+        }
+        if (foundIndex < 0) {
+            clear();
+            return;
+        }
+        idLabel.setText("Agent: " + snapshot.getAgentId()[foundIndex]);
+        positionLabel.setText("Position: (" + snapshot.getAgentX()[foundIndex] + ", " + snapshot.getAgentY()[foundIndex] + ")");
+        ageLabel.setText("Age: " + snapshot.getAgentAge()[foundIndex]);
+        energyLabel.setText(String.format("Energy: %.3f", snapshot.getAgentEnergy()[foundIndex]));
+        hungerLabel.setText(String.format("Hunger: %.3f", snapshot.getAgentHunger()[foundIndex]));
+        stressLabel.setText(String.format("Stress: %.3f", snapshot.getAgentStress()[foundIndex]));
+        predictionErrorLabel.setText(String.format("Prediction Error: %.3f", snapshot.getAgentPredictionError()[foundIndex]));
+        awarenessLabel.setText("Awareness: " + snapshot.getAgentAwareness()[foundIndex]);
         rulesList.getItems().setAll(Collections.emptyList());
     }
 }

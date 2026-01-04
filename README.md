@@ -13,14 +13,13 @@ Simulation World is a Maven multi-module project providing a headless simulation
 - JavaFX SDK is fetched automatically via Maven.
 
 ## Building
-```bash
+```
 mvn clean install
 ```
 
 ## Running
 You can run the JavaFX viewer using either the UI module or the launcher module:
-
-```bash
+```
 # From the repository root
 mvn -pl ui-viewer javafx:run
 # or
@@ -28,16 +27,19 @@ mvn -pl app exec:java
 ```
 
 To override the world seed, pass a JVM property:
-```bash
+```
 mvn -pl ui-viewer javafx:run -Dsim.seed=9001
 ```
 
 ## IDE Setup
 1. Import the root `pom.xml` as a Maven project (e.g., IntelliJ IDEA).
-2. Ensure the Maven projects view shows `sim-core`, `ui-viewer`, and `app` modules.
-3. Run configuration: set main class to `uiviewer.app.MainApp` (UI module) or `app.Launcher` (app module). VM options for JavaFX are handled by the Maven plugin.
+2. Run the Maven "install" lifecycle once to download JavaFX.
+3. Use the Maven run configuration `javafx:run` on the `ui-viewer` module (main class `uiviewer.app.MainApp`).
 
 ## Controls
-- Hover over the canvas to inspect tile food, hazard, and crowding fields.
-- Click to select the agent located on the hovered tile and view its inspector details.
-- Use the overlay toggles (Food, Hazard, Crowding, Culture) to change the tile coloring mode.
+- **Camera**: scroll to zoom on the cursor, right/middle-drag to pan.
+- **Hover**: hover updates tile food, hazard, crowding, and agent counts.
+- **Selection**: left-click locks the tile selection; clicking a tile with agents picks the closest agent for inspection.
+- **Overlays**: Food, Hazard, Crowding, and Culture coloring; toggle "Show Agents" to hide or show agent sprites.
+- **Simulation**: Use Start to resume ticking, Pause/Resume to toggle; Generate regenerates the world from the sliders/seed; Reset restores defaults.
+- **Brush**: pick Food/Hazard/Eraser and Small/Medium/Large sizes; left-click paints live field changes on the hovered tile.

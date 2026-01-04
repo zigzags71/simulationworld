@@ -1,5 +1,6 @@
 package simcore.world;
 
+import simcore.config.MapGenConfig;
 import simcore.config.SimConfig;
 import simcore.util.MathUtil;
 
@@ -24,32 +25,40 @@ public class WorldGrid {
     }
 
     public static WorldGrid generate(long seed) {
-        Random random = new Random(seed);
-        float[] food = new float[SimConfig.WORLD_W * SimConfig.WORLD_H];
+        return generate(MapGenConfig.defaults().withSeed(seed));
+    }
+
+    public static WorldGrid generate(MapGenConfig config) {
+        Random random = new Random(config.getSeed());
+        int width = SimConfig.WORLD_W;
+        int height = SimConfig.WORLD_H;
+        float[] food = new float[width * height];
         float[] hazard = new float[food.length];
         boolean[] water = new boolean[food.length];
 
-        float foodBase = 0.4f + random.nextFloat() * 0.2f;
-        float hazardBase = 0.3f + random.nextFloat() * 0.3f;
+        float foodBase = 0.25f + config.getFoodRichness() * 0.75f;
+        float hazardBase = 0.2f + config.getHazardBaseline() * 0.6f;
+        float noiseScale = 0.35f + config.getPatchiness() * 0.65f;
+        float waterThreshold = 0.05f + config.getWaterRatio() * 0.45f;
 
-        for (int y = 0; y < SimConfig.WORLD_H; y++) {
-            for (int x = 0; x < SimConfig.WORLD_W; x++) {
-                int idx = index(x, y, SimConfig.WORLD_W);
-                float fx = (float) x / SimConfig.WORLD_W;
-                float fy = (float) y / SimConfig.WORLD_H;
-                float foodNoise = layeredNoise(random, fx, fy);
-                float hazardNoise = layeredNoise(random, fy, fx);
-                food[idx] = MathUtil.clamp01(foodBase + foodNoise * 0.6f);
-                hazard[idx] = MathUtil.clamp01(hazardBase + hazardNoise * 0.6f);
-                water[idx] = (food[idx] < 0.25f && hazard[idx] < 0.25f);
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                int idx = index(x, y, width);
+                float fx = (float) x / width;
+                float fy = (float) y / height;
+                float foodNoise = layeredNoise(random, fx, fy, config.getPatchiness());
+                float hazardNoise = layeredNoise(random, fy, fx, 1f - config.getPatchiness());
+                food[idx] = MathUtil.clamp01(foodBase + foodNoise * noiseScale);
+                hazard[idx] = MathUtil.clamp01(hazardBase + hazardNoise * noiseScale);
+                water[idx] = (food[idx] + hazard[idx]) < waterThreshold;
             }
         }
 
-        smooth(water, food, hazard, SimConfig.WORLD_W, SimConfig.WORLD_H);
-        return new WorldGrid(SimConfig.WORLD_W, SimConfig.WORLD_H, food, hazard, water);
+        smooth(water, food, hazard, width, height, config.getWaterRatio());
+        return new WorldGrid(width, height, food, hazard, water);
     }
 
-    private static void smooth(boolean[] water, float[] food, float[] hazard, int w, int h) {
+    private static void smooth(boolean[] water, float[] food, float[] hazard, int w, int h, float waterRatio) {
         int[] neighborWater = new int[water.length];
         for (int y = 1; y < h - 1; y++) {
             for (int x = 1; x < w - 1; x++) {
@@ -68,25 +77,25 @@ public class WorldGrid {
                 neighborWater[idx] = count;
             }
         }
+        float erosion = 0.8f - waterRatio * 0.5f;
+        float hazardLift = 0.1f + waterRatio * 0.3f;
         for (int i = 0; i < water.length; i++) {
             if (neighborWater[i] > 4) {
                 water[i] = true;
             }
-            food[i] = MathUtil.clamp01(food[i] * 0.9f + (water[i] ? 0.0f : 0.1f));
-            hazard[i] = MathUtil.clamp01(hazard[i] * 0.9f + (water[i] ? 0.2f : 0.0f));
+            food[i] = MathUtil.clamp01(food[i] * erosion + (water[i] ? 0.0f : 0.1f));
+            hazard[i] = MathUtil.clamp01(hazard[i] * erosion + (water[i] ? hazardLift : 0.0f));
         }
     }
 
-    private static float layeredNoise(Random baseRandom, float x, float y) {
+    private static float layeredNoise(Random baseRandom, float x, float y, float roughness) {
         long combined = Double.doubleToLongBits(x) ^ (Double.doubleToLongBits(y) << 1);
         Random rand = new Random(baseRandom.nextLong() ^ combined);
         float value = 0f;
         float amplitude = 1f;
-        float frequency = 1f;
-        for (int i = 0; i < 3; i++) {
-            value += (rand.nextFloat() - 0.5f) * amplitude;
+        for (int i = 0; i < 4; i++) {
+            value += (rand.nextFloat() - 0.5f) * amplitude * (0.5f + roughness);
             amplitude *= 0.5f;
-            frequency *= 2f;
         }
         return value;
     }

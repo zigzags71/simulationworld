@@ -2,7 +2,6 @@ package uiviewer.render;
 
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
-import javafx.scene.image.PixelWriter;
 import javafx.scene.paint.Color;
 import simcore.snapshot.RenderSnapshot;
 
@@ -13,29 +12,44 @@ public class CanvasRenderer {
         this.canvas = canvas;
     }
 
-    public void render(RenderSnapshot snapshot, OverlayMode mode) {
+    public void render(RenderSnapshot snapshot, OverlayMode mode, Camera camera, boolean showAgents, SelectionState selectionState) {
         if (snapshot == null) {
             return;
         }
-        int w = snapshot.getWidth();
-        int h = snapshot.getHeight();
-        double scaleX = canvas.getWidth() / w;
-        double scaleY = canvas.getHeight() / h;
-        javafx.scene.image.WritableImage image = new javafx.scene.image.WritableImage(w, h);
-        PixelWriter writer = image.getPixelWriter();
+        camera.setViewport(canvas.getWidth(), canvas.getHeight());
+        GraphicsContext gc = canvas.getGraphicsContext2D();
+        gc.setFill(Color.BLACK);
+        gc.fillRect(0, 0, canvas.getWidth(), canvas.getHeight());
+
         float[] overlay = selectOverlay(snapshot, mode);
-        int[] cultureColors = buildCultureMap(snapshot, w, h);
-        for (int y = 0; y < h; y++) {
-            for (int x = 0; x < w; x++) {
-                int idx = y * w + x;
+        int minX = camera.getVisibleMinX(canvas.getWidth());
+        int maxX = camera.getVisibleMaxX(canvas.getWidth());
+        int minY = camera.getVisibleMinY(canvas.getHeight());
+        int maxY = camera.getVisibleMaxY(canvas.getHeight());
+        int[] cultureColors = buildCultureMap(snapshot, minX, maxX, minY, maxY, snapshot.getWidth());
+        double tileSize = camera.getZoom();
+        for (int y = minY; y <= maxY; y++) {
+            double screenY = camera.worldToScreenY(y);
+            for (int x = minX; x <= maxX; x++) {
+                int idx = y * snapshot.getWidth() + x;
                 Color color = colorForValue(overlay[idx], mode, cultureColors[idx]);
-                writer.setColor(x, y, color);
+                double screenX = camera.worldToScreenX(x);
+                gc.setFill(color);
+                gc.fillRect(screenX, screenY, tileSize + 0.5, tileSize + 0.5);
             }
         }
-        GraphicsContext gc = canvas.getGraphicsContext2D();
-        gc.clearRect(0, 0, canvas.getWidth(), canvas.getHeight());
-        gc.drawImage(image, 0, 0, w, h, 0, 0, canvas.getWidth(), canvas.getHeight());
-        drawAgents(gc, snapshot, scaleX, scaleY);
+
+        if (selectionState != null && selectionState.getSelectedTileX() >= 0) {
+            gc.setStroke(Color.YELLOW);
+            gc.setLineWidth(1.5);
+            double sx = camera.worldToScreenX(selectionState.getSelectedTileX());
+            double sy = camera.worldToScreenY(selectionState.getSelectedTileY());
+            gc.strokeRect(sx, sy, tileSize, tileSize);
+        }
+
+        if (showAgents) {
+            drawAgents(gc, snapshot, camera, selectionState, minX, maxX, minY, maxY);
+        }
     }
 
     private float[] selectOverlay(RenderSnapshot snapshot, OverlayMode mode) {
@@ -46,8 +60,9 @@ public class CanvasRenderer {
         };
     }
 
-    private int[] buildCultureMap(RenderSnapshot snapshot, int w, int h) {
-        int[] culture = new int[w * h];
+    private int[] buildCultureMap(RenderSnapshot snapshot, int minX, int maxX, int minY, int maxY, int worldWidth) {
+        int width = snapshot.getWidth();
+        int[] culture = new int[width * snapshot.getHeight()];
         int[] xs = snapshot.getAgentX();
         int[] ys = snapshot.getAgentY();
         int[] colors = snapshot.getAgentColorARGB();
@@ -55,8 +70,8 @@ public class CanvasRenderer {
         for (int i = 0; i < count; i++) {
             int x = xs[i];
             int y = ys[i];
-            if (x >= 0 && y >= 0 && x < w && y < h) {
-                culture[y * w + x] = colors[i];
+            if (x >= minX && x <= maxX && y >= minY && y <= maxY) {
+                culture[y * worldWidth + x] = colors[i];
             }
         }
         return culture;
@@ -72,18 +87,34 @@ public class CanvasRenderer {
         };
     }
 
-    private void drawAgents(GraphicsContext gc, RenderSnapshot snapshot, double scaleX, double scaleY) {
+    private void drawAgents(GraphicsContext gc, RenderSnapshot snapshot, Camera camera, SelectionState selectionState, int minX, int maxX, int minY, int maxY) {
         int[] xs = snapshot.getAgentX();
         int[] ys = snapshot.getAgentY();
         int[] colors = snapshot.getAgentColorARGB();
+        long[] ids = snapshot.getAgentId();
         int count = snapshot.getAgentCount();
+        double tileSize = camera.getZoom();
+        long selectedId = selectionState != null ? selectionState.getSelectedAgentId() : -1;
         for (int i = 0; i < count; i++) {
             int x = xs[i];
             int y = ys[i];
+            if (x < minX || x > maxX || y < minY || y > maxY) {
+                continue;
+            }
             int argb = colors[i];
-            Color color = colorFromArgb(argb);
-            gc.setFill(color);
-            gc.fillRect(x * scaleX, y * scaleY, Math.max(1, scaleX), Math.max(1, scaleY));
+            Color color = colorFromArgb(argb).interpolate(Color.WHITE, 0.3);
+            double screenX = camera.worldToScreenX(x);
+            double screenY = camera.worldToScreenY(y);
+            boolean selected = ids[i] == selectedId;
+            double size = selected ? Math.max(3, tileSize * 1.6) : Math.max(2, tileSize * 0.9);
+            double offset = (tileSize - size) / 2.0;
+            gc.setFill(selected ? Color.WHITE : color);
+            gc.fillOval(screenX + offset, screenY + offset, size, size);
+            if (selected) {
+                gc.setStroke(Color.BLACK);
+                gc.setLineWidth(1);
+                gc.strokeOval(screenX + offset - 1, screenY + offset - 1, size + 2, size + 2);
+            }
         }
     }
 

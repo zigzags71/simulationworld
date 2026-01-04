@@ -13,11 +13,22 @@ public class RenderSnapshot {
     private final int[] agentY;
     private final int[] agentColorARGB;
     private final long[] agentId;
+    private final int[] agentAge;
+    private final float[] agentEnergy;
+    private final float[] agentHunger;
+    private final float[] agentStress;
+    private final float[] agentPredictionError;
+    private final boolean[] agentAwareness;
+    private final int[] agentCultureId;
+    private final int[] agentCounts;
     private final int agentCount;
     private final long tickIndex;
 
     public RenderSnapshot(int width, int height, float[] food, float[] hazard, float[] crowding,
-                          int[] agentX, int[] agentY, int[] agentColorARGB, long[] agentId, int agentCount, long tickIndex) {
+                          int[] agentX, int[] agentY, int[] agentColorARGB, long[] agentId,
+                          int[] agentAge, float[] agentEnergy, float[] agentHunger, float[] agentStress,
+                          float[] agentPredictionError, boolean[] agentAwareness, int[] agentCultureId,
+                          int[] agentCounts, int agentCount, long tickIndex) {
         this.width = width;
         this.height = height;
         this.food = food;
@@ -27,6 +38,14 @@ public class RenderSnapshot {
         this.agentY = agentY;
         this.agentColorARGB = agentColorARGB;
         this.agentId = agentId;
+        this.agentAge = agentAge;
+        this.agentEnergy = agentEnergy;
+        this.agentHunger = agentHunger;
+        this.agentStress = agentStress;
+        this.agentPredictionError = agentPredictionError;
+        this.agentAwareness = agentAwareness;
+        this.agentCultureId = agentCultureId;
+        this.agentCounts = agentCounts;
         this.agentCount = agentCount;
         this.tickIndex = tickIndex;
     }
@@ -65,6 +84,38 @@ public class RenderSnapshot {
 
     public long[] getAgentId() {
         return agentId;
+    }
+
+    public int[] getAgentAge() {
+        return agentAge;
+    }
+
+    public float[] getAgentEnergy() {
+        return agentEnergy;
+    }
+
+    public float[] getAgentHunger() {
+        return agentHunger;
+    }
+
+    public float[] getAgentStress() {
+        return agentStress;
+    }
+
+    public float[] getAgentPredictionError() {
+        return agentPredictionError;
+    }
+
+    public boolean[] getAgentAwareness() {
+        return agentAwareness;
+    }
+
+    public int[] getAgentCultureId() {
+        return agentCultureId;
+    }
+
+    public int[] getAgentCounts() {
+        return agentCounts;
     }
 
     public int getAgentCount() {

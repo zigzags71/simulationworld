@@ -2,33 +2,46 @@ package simcore.sim;
 
 import simcore.agents.AgentState;
 import simcore.agents.AgentSystem;
+import simcore.config.MapGenConfig;
 import simcore.config.SimConfig;
 import simcore.events.TelemetryBus;
 import simcore.events.TelemetryEvent;
+import simcore.sim.commands.PlaceFieldBrushCommand;
 import simcore.snapshot.RenderSnapshot;
 import simcore.snapshot.SnapshotBuffer;
 import simcore.util.ColorUtil;
+import simcore.util.FieldBrushApplier;
 import simcore.util.MathUtil;
 import simcore.world.WorldGrid;
 
+import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class SimulationEngine {
-    private final WorldGrid world;
-    private final AgentSystem agents;
+    private WorldGrid world;
+    private AgentSystem agents;
     private final SnapshotBuffer snapshotBuffer;
     private final TelemetryBus telemetryBus;
     private final TickLoop tickLoop;
     private final ExecutorService executorService;
     private final AtomicBoolean running = new AtomicBoolean(false);
+    private final AtomicBoolean loopStarted = new AtomicBoolean(false);
+    private final ConcurrentLinkedQueue<PlaceFieldBrushCommand> brushQueue = new ConcurrentLinkedQueue<>();
+    private MapGenConfig mapGenConfig;
     private long tickIndex = 0;
 
     public SimulationEngine(long seed, TelemetryBus telemetryBus) {
-        this.world = WorldGrid.generate(seed);
-        this.agents = new AgentSystem(world, seed + 99);
+        this(MapGenConfig.defaults().withSeed(seed), telemetryBus);
+    }
+
+    public SimulationEngine(MapGenConfig mapGenConfig, TelemetryBus telemetryBus) {
+        this.mapGenConfig = mapGenConfig;
+        this.world = WorldGrid.generate(mapGenConfig);
+        this.agents = new AgentSystem(world, mapGenConfig.getSeed() + 99);
         this.snapshotBuffer = new SnapshotBuffer(SimConfig.WORLD_W, SimConfig.WORLD_H, SimConfig.NUM_AGENTS);
         this.telemetryBus = telemetryBus;
         this.tickLoop = new TickLoop(SimConfig.TICK_RATE, this::step);
@@ -37,9 +50,10 @@ public class SimulationEngine {
     }
 
     public void start() {
-        if (running.compareAndSet(false, true)) {
+        if (loopStarted.compareAndSet(false, true)) {
             executorService.submit(tickLoop);
         }
+        running.set(true);
     }
 
     public void stop() {
@@ -48,19 +62,50 @@ public class SimulationEngine {
         executorService.shutdownNow();
     }
 
+    public void pause() {
+        running.set(false);
+    }
+
+    public void resume() {
+        running.set(true);
+    }
+
     public RenderSnapshot getLatestSnapshot() {
         return snapshotBuffer.getLatest();
     }
 
-    private void step() {
-        if (!running.get()) {
-            return;
-        }
-        agents.tick(world);
-        tickIndex++;
+    public void regenerate(MapGenConfig newConfig) {
+        running.set(false);
+        this.mapGenConfig = newConfig;
+        this.world = WorldGrid.generate(newConfig);
+        this.agents = new AgentSystem(world, newConfig.getSeed() + 99);
+        this.tickIndex = 0;
+        brushQueue.clear();
         writeSnapshot();
-        float meanPredictionError = computeMeanPredictionError(agents.getAgents());
-        telemetryBus.publish(new TelemetryEvent(tickIndex, agents.getAgents().size(), meanPredictionError));
+    }
+
+    public void reset() {
+        regenerate(MapGenConfig.defaults());
+    }
+
+    public void queueBrushCommand(PlaceFieldBrushCommand command) {
+        brushQueue.add(command);
+    }
+
+    private void step() {
+        boolean dirty = applyBrushCommands();
+        if (running.get()) {
+            agents.tick(world);
+            tickIndex++;
+            dirty = true;
+        }
+        if (dirty) {
+            writeSnapshot();
+        }
+        if (running.get()) {
+            float meanPredictionError = computeMeanPredictionError(agents.getAgents());
+            telemetryBus.publish(new TelemetryEvent(tickIndex, agents.getAgents().size(), meanPredictionError));
+        }
     }
 
     private float computeMeanPredictionError(List<AgentState> agentsList) {
@@ -75,7 +120,7 @@ public class SimulationEngine {
         RenderSnapshot back = snapshotBuffer.beginWrite();
         System.arraycopy(world.getFoodField(), 0, back.getFood(), 0, back.getFood().length);
         System.arraycopy(world.getHazardField(), 0, back.getHazard(), 0, back.getHazard().length);
-        int[] crowdCounts = new int[back.getCrowding().length];
+        Arrays.fill(back.getAgentCounts(), 0);
         List<AgentState> agentStates = agents.getAgents();
         int index = 0;
         for (AgentState agent : agentStates) {
@@ -83,8 +128,15 @@ public class SimulationEngine {
             back.getAgentY()[index] = agent.getY();
             back.getAgentColorARGB()[index] = ColorUtil.colorFromSeed(agent.getCultureId());
             back.getAgentId()[index] = agent.getId().value();
+            back.getAgentAge()[index] = agent.getAge();
+            back.getAgentEnergy()[index] = agent.getEnergy();
+            back.getAgentHunger()[index] = agent.getHunger();
+            back.getAgentStress()[index] = agent.getStress();
+            back.getAgentPredictionError()[index] = agent.getPredictionError();
+            back.getAgentAwareness()[index] = agent.isAwarenessFlag();
+            back.getAgentCultureId()[index] = agent.getCultureId();
             int idx = MathUtil.index(agent.getX(), agent.getY(), world.getWidth());
-            crowdCounts[idx] += 1;
+            back.getAgentCounts()[idx] += 1;
             index++;
         }
         for (int i = index; i < back.getAgentX().length; i++) {
@@ -92,9 +144,16 @@ public class SimulationEngine {
             back.getAgentY()[i] = -1;
             back.getAgentColorARGB()[i] = 0;
             back.getAgentId()[i] = -1;
+            back.getAgentAge()[i] = 0;
+            back.getAgentEnergy()[i] = 0f;
+            back.getAgentHunger()[i] = 0f;
+            back.getAgentStress()[i] = 0f;
+            back.getAgentPredictionError()[i] = 0f;
+            back.getAgentAwareness()[i] = false;
+            back.getAgentCultureId()[i] = 0;
         }
-        for (int i = 0; i < crowdCounts.length; i++) {
-            back.getCrowding()[i] = crowdCounts[i] / 5f;
+        for (int i = 0; i < back.getCrowding().length; i++) {
+            back.getCrowding()[i] = back.getAgentCounts()[i] / 5f;
         }
         snapshotBuffer.setAgentCount(agentStates.size());
         snapshotBuffer.publish(tickIndex);
@@ -104,11 +163,15 @@ public class SimulationEngine {
         return telemetryBus;
     }
 
-    public WorldGrid getWorld() {
-        return world;
-    }
-
-    public AgentState findAgentById(long id) {
-        return agents.findAgentById(id);
+    private boolean applyBrushCommands() {
+        boolean changed = false;
+        PlaceFieldBrushCommand command;
+        float foodBaseline = 0.25f + mapGenConfig.getFoodRichness() * 0.75f;
+        float hazardBaseline = 0.2f + mapGenConfig.getHazardBaseline() * 0.6f;
+        while ((command = brushQueue.poll()) != null) {
+            changed |= FieldBrushApplier.apply(command, world.getFoodField(), world.getHazardField(), world.getWidth(), world.getHeight(),
+                    foodBaseline, hazardBaseline);
+        }
+        return changed;
     }
 }

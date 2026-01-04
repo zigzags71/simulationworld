@@ -1,10 +1,13 @@
 package simcore.agents;
 
+import simcore.config.SimConfig;
+import simcore.util.MathUtil;
+
 public class AgentState {
     private final AgentId id;
     private int x;
     private int y;
-    private int age;
+    private int ageTicks;
     private float energy;
     private float hunger;
     private float stress;
@@ -16,10 +19,10 @@ public class AgentState {
         this.id = id;
         this.x = x;
         this.y = y;
-        this.age = 0;
+        this.ageTicks = 0;
         this.energy = energy;
-        this.hunger = 0f;
-        this.stress = 0f;
+        this.hunger = SimConfig.INITIAL_HUNGER;
+        this.stress = SimConfig.INITIAL_STRESS;
         this.predictionError = 0f;
         this.awarenessFlag = false;
         this.cultureId = cultureId;
@@ -37,8 +40,8 @@ public class AgentState {
         return y;
     }
 
-    public int getAge() {
-        return age;
+    public int getAgeTicks() {
+        return ageTicks;
     }
 
     public float getEnergy() {
@@ -65,13 +68,13 @@ public class AgentState {
         return cultureId;
     }
 
-    public void updateStats(float energyDelta, float hungerDelta, float stressDelta, float predictionDelta) {
-        this.age += 1;
+    public void applyTick(float energyDelta, float hungerDelta, float stressDelta, float predictionDelta) {
+        this.ageTicks += 1;
         this.energy = clampMetric(energy + energyDelta);
         this.hunger = clampMetric(hunger + hungerDelta);
         this.stress = clampMetric(stress + stressDelta);
         this.predictionError = clampMetric(predictionError + predictionDelta);
-        if (predictionError > 0.7f) {
+        if (predictionError > SimConfig.AWARENESS_THRESHOLD) {
             awarenessFlag = true;
         }
     }
@@ -81,7 +84,16 @@ public class AgentState {
         this.y = newY;
     }
 
+    public void applyNutrition(float hungerGain, float energyGain) {
+        this.hunger = clampMetric(hunger + hungerGain);
+        this.energy = clampMetric(energy + energyGain);
+    }
+
+    public boolean isDead() {
+        return energy <= 0f || hunger <= 0f || stress >= 1f;
+    }
+
     private float clampMetric(float value) {
-        return Math.max(0f, Math.min(1f, value));
+        return MathUtil.clamp01(value);
     }
 }

@@ -56,6 +56,17 @@ public final class ContextKey {
         return foodAffordance;
     }
 
+    /**
+     * Computes the Manhattan-like distance between two {@link ContextKey} instances.
+     * <p>
+     * Distance is defined as the sum of absolute differences across all binned numeric
+     * features (hunger, energy, stress, food, hazard, crowding) plus {@code 1} if the
+     * awareness flag differs and the popcount of differing affordance bits.
+     * This definition must remain stable to keep rule matching predictable.
+     *
+     * @param other the other context key
+     * @return distance as described above
+     */
     public int distanceTo(ContextKey other) {
         int dist = 0;
         dist += Math.abs(hungerBin - other.hungerBin);
@@ -64,8 +75,8 @@ public final class ContextKey {
         dist += Math.abs(foodBin - other.foodBin);
         dist += Math.abs(hazardBin - other.hazardBin);
         dist += Math.abs(crowdingBin - other.crowdingBin);
-        dist += Math.abs(awarenessFlag - other.awarenessFlag);
-        dist += Math.abs(foodAffordance - other.foodAffordance);
+        dist += (awarenessFlag == other.awarenessFlag) ? 0 : 1;
+        dist += Integer.bitCount(foodAffordance ^ other.foodAffordance);
         return dist;
     }
 

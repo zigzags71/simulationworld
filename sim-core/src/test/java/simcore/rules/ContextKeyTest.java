@@ -26,7 +26,19 @@ class ContextKeyTest {
         ContextKey neighbor = new ContextKey(1, 0, 0, 0, 0, 0, 0, 0);
         ContextKey far = new ContextKey(4, 4, 4, 4, 4, 4, 1, 1);
 
-        assertEquals(1, base.distanceTo(neighbor));
-        assertEquals(23, base.distanceTo(far));
+        assertEquals(expectedDistance(base, neighbor), base.distanceTo(neighbor));
+        assertEquals(expectedDistance(base, far), base.distanceTo(far));
+    }
+
+    private int expectedDistance(ContextKey a, ContextKey b) {
+        int binDiff = Math.abs(a.getHungerBin() - b.getHungerBin())
+                + Math.abs(a.getEnergyBin() - b.getEnergyBin())
+                + Math.abs(a.getStressBin() - b.getStressBin())
+                + Math.abs(a.getFoodBin() - b.getFoodBin())
+                + Math.abs(a.getHazardBin() - b.getHazardBin())
+                + Math.abs(a.getCrowdingBin() - b.getCrowdingBin());
+        int awarenessDiff = a.getAwarenessFlag() == b.getAwarenessFlag() ? 0 : 1;
+        int affordanceDiff = Integer.bitCount(a.getFoodAffordance() ^ b.getFoodAffordance());
+        return binDiff + awarenessDiff + affordanceDiff;
     }
 }

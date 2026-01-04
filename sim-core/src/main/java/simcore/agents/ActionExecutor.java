@@ -116,15 +116,15 @@ public class ActionExecutor {
             int requestIndex = requestOrder.get(i);
             int agentSlot = eatRequests.getAgentSlot(requestIndex);
             float desired = eatRequests.getDesiredAmount(requestIndex);
-            boolean hasFood = available >= SimConfig.FOOD_MIN_TO_EAT;
-            boolean success = hasFood && available >= desired;
-            float consumed = success ? desired : 0f;
-            if (success) {
-                available -= consumed;
-            }
+            float consumed = Math.min(desired, available);
+            boolean success = consumed > 0f;
+            available -= consumed;
             float hungerGain = consumed * SimConfig.FOOD_TO_HUNGER_GAIN;
             float energyGain = consumed * SimConfig.FOOD_TO_ENERGY_GAIN;
-            float stressChange = success ? -SimConfig.STRESS_RECOVERY_PER_TICK * 0.5f : SimConfig.HAZARD_STRESS_GAIN_PER_TICK * 0.2f;
+            boolean fullBite = consumed >= desired;
+            float stressChange = success
+                    ? (fullBite ? -SimConfig.STRESS_RECOVERY_PER_TICK * 0.5f : SimConfig.HAZARD_STRESS_GAIN_PER_TICK * 0.1f)
+                    : SimConfig.HAZARD_STRESS_GAIN_PER_TICK * 0.2f;
             actionDeltas[agentSlot] = new OutcomeVector(energyGain, hungerGain, stressChange);
             if (eventBus != null && SimConfig.LOG_SELECTED_AGENT_ENABLED) {
                 eventBus.publish(new AgentEatAttemptEvent(eatRequests.getAgentId(requestIndex), tileIndex, success, consumed,

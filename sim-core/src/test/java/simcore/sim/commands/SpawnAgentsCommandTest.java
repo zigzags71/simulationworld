@@ -62,6 +62,6 @@ class SpawnAgentsCommandTest {
     private WorldGrid flatWorld(int width, int height, boolean[] waterMask) {
         float[] food = new float[width * height];
         float[] hazard = new float[width * height];
-        return new WorldGrid(width, height, food, hazard, waterMask);
+        return new WorldGrid(width, height, 1L, food, hazard, waterMask);
     }
 }

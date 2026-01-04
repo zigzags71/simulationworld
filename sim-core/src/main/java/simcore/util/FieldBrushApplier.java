@@ -35,7 +35,8 @@ public final class FieldBrushApplier {
                 float intensity = falloff * falloff * jitter * SimConfig.BRUSH_MAX_DELTA;
                 int idx = MathUtil.index(x, y, width);
                 if (command.getType() == BrushType.FOOD) {
-                    float next = MathUtil.clamp01(food[idx] + intensity);
+                    float delta = SimConfig.FOOD_PAINT_ADD * intensity;
+                    float next = Math.min(food[idx] + delta, SimConfig.TILE_FOOD_MAX);
                     changed |= next != food[idx];
                     food[idx] = next;
                 } else if (command.getType() == BrushType.HAZARD) {
@@ -44,7 +45,7 @@ public final class FieldBrushApplier {
                     hazard[idx] = next;
                 } else {
                     float blend = falloff * SimConfig.BRUSH_ERASE_BLEND;
-                    float nextFood = MathUtil.lerp(food[idx], foodBaseline, blend);
+                    float nextFood = Math.min(MathUtil.lerp(food[idx], foodBaseline, blend), SimConfig.TILE_FOOD_MAX);
                     float nextHazard = MathUtil.lerp(hazard[idx], hazardBaseline, blend);
                     changed |= nextFood != food[idx] || nextHazard != hazard[idx];
                     food[idx] = nextFood;

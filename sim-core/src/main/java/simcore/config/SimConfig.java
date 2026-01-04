@@ -32,6 +32,9 @@ public final class SimConfig {
     public static final float CONSUME_HUNGER_THRESHOLD = 0.65f;
     public static final float FOOD_MIN_TO_EAT = 0.02f;
     public static final float FOOD_CONSUME_RATE = 0.015f;
+    public static final float TILE_FOOD_MAX = 1.0f;
+    public static final float FOOD_PAINT_ADD = 0.2f;
+    public static final float FOOD_REGEN_PER_TICK = 0.0f;
     public static final float FOOD_TO_HUNGER_GAIN = 0.8f;
     public static final float FOOD_TO_ENERGY_GAIN = 0.3f;
 
@@ -57,6 +60,10 @@ public final class SimConfig {
     public static boolean LOG_SELECTED_AGENT_ENABLED = false;
     public static boolean LOG_SELECTED_REGION_ENABLED = false;
     public static int LOG_THROTTLE_TICKS = 20;
+    public static boolean FILE_LOG_ENABLED = false;
+    public static String LOG_DIR = "./logs";
+    public static int SUMMARY_INTERVAL_TICKS = 20;
+    public static int SELECTION_INTERVAL_TICKS = 20;
 
     private SimConfig() {
     }

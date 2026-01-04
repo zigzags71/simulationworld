@@ -10,7 +10,8 @@ class AgentStateMetabolismTest {
 
     @Test
     void clampsAndDetectsDeath() {
-        AgentState agent = new AgentState(new AgentId(1), 0, 0, SimConfig.INITIAL_ENERGY, 0);
+        AgentState agent = AgentState.forTest(new AgentId(1), 0, 0, SimConfig.INITIAL_ENERGY,
+                SimConfig.INITIAL_HUNGER, SimConfig.INITIAL_STRESS, 0f);
 
         agent.applyTick(-2.0f, -2.0f, 2.0f);
 

@@ -18,11 +18,13 @@ public class AgentState {
     private float stress;
     private float predictionError;
     private final boolean awarenessFlag;
+    private final int firstNameId;
+    private final int surnameId;
     private int cultureId;
     private final List<Rule> rulebook;
     private long nextRuleId;
 
-    public AgentState(AgentId id, int x, int y, float energy, int cultureId) {
+    public AgentState(AgentId id, int x, int y, float energy, int firstNameId, int surnameId, int cultureId) {
         this.id = id;
         this.x = x;
         this.y = y;
@@ -32,9 +34,21 @@ public class AgentState {
         this.stress = SimConfig.INITIAL_STRESS;
         this.predictionError = 0f;
         this.awarenessFlag = false;
+        this.firstNameId = firstNameId;
+        this.surnameId = surnameId;
         this.cultureId = cultureId;
         this.rulebook = new ArrayList<>();
         this.nextRuleId = 1;
+    }
+
+    public static AgentState forTest(AgentId id, int x, int y, float energy, float hunger, float stress, float predictionError) {
+        AgentState state = new AgentState(id, x, y, energy, 0, 0, 0);
+        state.ageTicks = 0;
+        state.energy = state.clampMetric(energy);
+        state.hunger = state.clampMetric(hunger);
+        state.stress = state.clampMetric(stress);
+        state.predictionError = state.clampMetric(predictionError);
+        return state;
     }
 
     public AgentId getId() {
@@ -71,6 +85,14 @@ public class AgentState {
 
     public boolean isAwarenessFlag() {
         return awarenessFlag;
+    }
+
+    public int getFirstNameId() {
+        return firstNameId;
+    }
+
+    public int getSurnameId() {
+        return surnameId;
     }
 
     public int getCultureId() {

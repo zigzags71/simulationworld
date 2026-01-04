@@ -20,7 +20,7 @@ class FieldBrushApplierTest {
 
         assertArrayEquals(foodA, foodB, "Brush should be deterministic for a given seed");
         assertArrayEquals(hazardA, hazardB);
-        assertTrue(foodA[MathUtil.index(2, 2, 5)] > 0.2f, "Center tile should increase");
+        assertTrue(foodA[MathUtil.index(2, 2, 5)] > 0.05f, "Center tile should increase");
     }
 
     @Test

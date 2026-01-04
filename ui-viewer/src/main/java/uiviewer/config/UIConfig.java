@@ -6,6 +6,7 @@ public final class UIConfig {
     public static final int DEFAULT_AGENT_SPAWN = 20;
     public static final int MIN_AGENT_SPAWN = 5;
     public static final int MAX_AGENT_SPAWN = 50;
+    public static final boolean RENDER_BENCHMARK_LOGGING = Boolean.getBoolean("ui.render.benchmark");
 
     private UIConfig() {
     }

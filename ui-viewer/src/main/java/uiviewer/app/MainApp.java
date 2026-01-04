@@ -81,15 +81,12 @@ public class MainApp extends Application {
 
         Canvas canvas = new Canvas(1024, 768);
         CanvasRenderer renderer = new CanvasRenderer(canvas);
-        renderLoop = new RenderLoop(engine, renderer, camera, selectionState) {
-            @Override
-            public void handle(long now) {
-                super.handle(now);
-                monitorBar.markFrameRendered(now);
-                regionInspectorPanel.update(engine.getLatestSnapshot(), selectionState);
-                agentInspectorPanel.update(engine.getLatestSnapshot(), selectionState.getSelectedAgentId());
-            }
-        };
+        renderLoop = new RenderLoop(engine, renderer, camera, selectionState);
+        renderLoop.setAfterRender((snapshot, now) -> {
+            monitorBar.markFrameRendered(now);
+            regionInspectorPanel.update(snapshot, selectionState);
+            agentInspectorPanel.update(snapshot, selectionState.getSelectedAgentId());
+        });
 
         VBox leftPanel = buildOverlayPanel();
         VBox controlPanel = buildControlPanel();

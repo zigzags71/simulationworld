@@ -2,11 +2,25 @@ package uiviewer.render;
 
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
+import javafx.scene.image.PixelFormat;
+import javafx.scene.image.PixelWriter;
+import javafx.scene.image.WritableImage;
 import javafx.scene.paint.Color;
 import simcore.snapshot.RenderSnapshot;
 
+import java.nio.IntBuffer;
+
 public class CanvasRenderer {
+    private static final PixelFormat<IntBuffer> ARGB_PRE_FORMAT = PixelFormat.getIntArgbPreInstance();
+    private static final int AGENT_GREEN = 0xFF00FF00;
+    private static final int SELECTED_AGENT = 0xFFFFFF66;
+    private static final int CULTURE_BASE = encodeColor(0.15, 0.15, 0.15, 1.0);
+
     private final Canvas canvas;
+    private WritableImage viewportImage;
+    private int[] argbBuffer;
+    private int bufferWidth;
+    private int bufferHeight;
 
     public CanvasRenderer(Canvas canvas) {
         this.canvas = canvas;
@@ -16,31 +30,107 @@ public class CanvasRenderer {
         if (snapshot == null) {
             return;
         }
-        camera.setViewport(canvas.getWidth(), canvas.getHeight());
-        GraphicsContext gc = canvas.getGraphicsContext2D();
-        gc.setFill(Color.BLACK);
-        gc.fillRect(0, 0, canvas.getWidth(), canvas.getHeight());
+        double canvasWidth = canvas.getWidth();
+        double canvasHeight = canvas.getHeight();
+        camera.setViewport(canvasWidth, canvasHeight);
 
-        float[] overlay = selectOverlay(snapshot, mode);
-        int minX = camera.getVisibleMinX(canvas.getWidth());
-        int maxX = camera.getVisibleMaxX(canvas.getWidth());
-        int minY = camera.getVisibleMinY(canvas.getHeight());
-        int maxY = camera.getVisibleMaxY(canvas.getHeight());
-        int[] cultureColors = buildCultureMap(snapshot, minX, maxX, minY, maxY, snapshot.getWidth());
-        double tileSize = camera.getZoom();
-        double overlayAlpha = showAgents ? 0.35 : 1.0;
-        for (int y = minY; y <= maxY; y++) {
-            double screenY = camera.worldToScreenY(y);
-            for (int x = minX; x <= maxX; x++) {
-                int idx = y * snapshot.getWidth() + x;
-                Color color = colorForValue(overlay[idx], mode, cultureColors[idx], overlayAlpha);
-                double screenX = camera.worldToScreenX(x);
-                gc.setFill(color);
-                gc.fillRect(screenX, screenY, tileSize + 0.5, tileSize + 0.5);
-            }
+        int minX = camera.getVisibleMinX(canvasWidth);
+        int maxX = camera.getVisibleMaxX(canvasWidth);
+        int minY = camera.getVisibleMinY(canvasHeight);
+        int maxY = camera.getVisibleMaxY(canvasHeight);
+        int viewWidth = maxX - minX + 1;
+        int viewHeight = maxY - minY + 1;
+        if (viewWidth <= 0 || viewHeight <= 0) {
+            return;
         }
 
-        if (selectionState != null && selectionState.hasRegion()) {
+        ensureBuffer(viewWidth, viewHeight);
+        double overlayAlpha = showAgents ? 0.35 : 1.0;
+        fillBase(snapshot, mode, minX, minY, viewWidth, viewHeight, overlayAlpha);
+        if (showAgents) {
+            overlayAgents(snapshot, mode, selectionState, minX, minY, viewWidth, viewHeight);
+        }
+        uploadBuffer(viewWidth, viewHeight);
+
+        GraphicsContext gc = canvas.getGraphicsContext2D();
+        gc.setFill(showAgents ? Color.rgb(8, 8, 8) : Color.BLACK);
+        gc.fillRect(0, 0, canvasWidth, canvasHeight);
+
+        double destX = Math.floor(camera.worldToScreenX(minX));
+        double destY = Math.floor(camera.worldToScreenY(minY));
+        double destW = viewWidth * camera.getZoom();
+        double destH = viewHeight * camera.getZoom();
+        gc.drawImage(viewportImage, destX, destY, destW, destH);
+
+        drawSelection(gc, camera, selectionState);
+    }
+
+    private void ensureBuffer(int viewWidth, int viewHeight) {
+        if (viewportImage == null || viewWidth != bufferWidth || viewHeight != bufferHeight) {
+            bufferWidth = viewWidth;
+            bufferHeight = viewHeight;
+            argbBuffer = new int[viewWidth * viewHeight];
+            viewportImage = new WritableImage(viewWidth, viewHeight);
+        }
+    }
+
+    private void fillBase(RenderSnapshot snapshot, OverlayMode mode, int minX, int minY, int viewWidth, int viewHeight, double overlayAlpha) {
+        if (mode == OverlayMode.CULTURE) {
+            int base = applyAlpha(CULTURE_BASE, overlayAlpha);
+            for (int i = 0; i < viewWidth * viewHeight; i++) {
+                argbBuffer[i] = base;
+            }
+            return;
+        }
+
+        float[] overlay = selectOverlay(snapshot, mode);
+        int worldWidth = snapshot.getWidth();
+        int bufferIndex = 0;
+        for (int y = 0; y < viewHeight; y++) {
+            int worldY = minY + y;
+            int rowStart = worldY * worldWidth + minX;
+            for (int x = 0; x < viewWidth; x++) {
+                float value = overlay[rowStart + x];
+                argbBuffer[bufferIndex++] = encodeOverlayColor(value, mode, overlayAlpha);
+            }
+        }
+    }
+
+    private void overlayAgents(RenderSnapshot snapshot, OverlayMode mode, SelectionState selectionState, int minX, int minY, int viewWidth, int viewHeight) {
+        int[] xs = snapshot.getAgentX();
+        int[] ys = snapshot.getAgentY();
+        int[] colors = snapshot.getAgentColorARGB();
+        long[] ids = snapshot.getAgentId();
+        int count = snapshot.getAgentCount();
+        long selectedId = selectionState != null ? selectionState.getSelectedAgentId() : -1;
+
+        for (int i = 0; i < count; i++) {
+            int worldX = xs[i];
+            int worldY = ys[i];
+            if (worldX < minX || worldX > minX + viewWidth - 1 || worldY < minY || worldY > minY + viewHeight - 1) {
+                continue;
+            }
+            int bufferIndex = (worldY - minY) * viewWidth + (worldX - minX);
+            boolean selected = ids[i] == selectedId;
+            if (mode == OverlayMode.CULTURE) {
+                argbBuffer[bufferIndex] = applyAlpha(colors[i] | 0xFF000000, 1.0);
+            } else {
+                argbBuffer[bufferIndex] = selected ? SELECTED_AGENT : AGENT_GREEN;
+            }
+        }
+    }
+
+    private void uploadBuffer(int viewWidth, int viewHeight) {
+        PixelWriter writer = viewportImage.getPixelWriter();
+        writer.setPixels(0, 0, viewWidth, viewHeight, ARGB_PRE_FORMAT, argbBuffer, 0, viewWidth);
+    }
+
+    private void drawSelection(GraphicsContext gc, Camera camera, SelectionState selectionState) {
+        if (selectionState == null) {
+            return;
+        }
+        double tileSize = camera.getZoom();
+        if (selectionState.hasRegion()) {
             gc.setStroke(Color.YELLOW);
             gc.setLineWidth(1.5);
             double startX = camera.worldToScreenX(Math.min(selectionState.getRegionStartX(), selectionState.getRegionEndX()));
@@ -52,16 +142,12 @@ public class CanvasRenderer {
             gc.strokeRect(startX, startY, width, height);
         }
 
-        if (selectionState != null && selectionState.getSelectedTileX() >= 0) {
+        if (selectionState.getSelectedTileX() >= 0) {
             gc.setStroke(Color.YELLOW);
             gc.setLineWidth(1.5);
             double sx = camera.worldToScreenX(selectionState.getSelectedTileX());
             double sy = camera.worldToScreenY(selectionState.getSelectedTileY());
             gc.strokeRect(sx, sy, tileSize, tileSize);
-        }
-
-        if (showAgents) {
-            drawAgents(gc, snapshot, camera, selectionState, minX, maxX, minY, maxY);
         }
     }
 
@@ -73,68 +159,31 @@ public class CanvasRenderer {
         };
     }
 
-    private int[] buildCultureMap(RenderSnapshot snapshot, int minX, int maxX, int minY, int maxY, int worldWidth) {
-        int width = snapshot.getWidth();
-        int[] culture = new int[width * snapshot.getHeight()];
-        int[] xs = snapshot.getAgentX();
-        int[] ys = snapshot.getAgentY();
-        int[] colors = snapshot.getAgentColorARGB();
-        int count = snapshot.getAgentCount();
-        for (int i = 0; i < count; i++) {
-            int x = xs[i];
-            int y = ys[i];
-            if (x >= minX && x <= maxX && y >= minY && y <= maxY) {
-                culture[y * worldWidth + x] = colors[i];
-            }
-        }
-        return culture;
-    }
-
-    private Color colorForValue(float value, OverlayMode mode, int cultureColor, double alpha) {
+    private int encodeOverlayColor(float value, OverlayMode mode, double alpha) {
         double clamped = Math.max(0.0, Math.min(1.0, value));
         return switch (mode) {
-            case FOOD -> Color.color(0.2 + clamped * 0.8, 0.5 + clamped * 0.5, 0.2, alpha);
-            case HAZARD -> Color.color(0.4 + clamped * 0.6, 0.2, 0.2 + clamped * 0.8, alpha);
-            case CROWDING -> Color.color(0.2, 0.2 + clamped * 0.8, 0.8, alpha);
-            case CULTURE -> cultureColor == 0 ? Color.color(0.15, 0.15, 0.15, alpha) : colorFromArgb(cultureColor).deriveColor(0, 1, 1, alpha);
+            case FOOD -> encodeColor(0.2 + clamped * 0.8, 0.5 + clamped * 0.5, 0.2, alpha);
+            case HAZARD -> encodeColor(0.4 + clamped * 0.6, 0.2, 0.2 + clamped * 0.8, alpha);
+            case CROWDING, CULTURE -> encodeColor(0.2, 0.2 + clamped * 0.8, 0.8, alpha);
         };
     }
 
-    private void drawAgents(GraphicsContext gc, RenderSnapshot snapshot, Camera camera, SelectionState selectionState, int minX, int maxX, int minY, int maxY) {
-        int[] xs = snapshot.getAgentX();
-        int[] ys = snapshot.getAgentY();
-        int[] colors = snapshot.getAgentColorARGB();
-        long[] ids = snapshot.getAgentId();
-        int count = snapshot.getAgentCount();
-        double tileSize = camera.getZoom();
-        long selectedId = selectionState != null ? selectionState.getSelectedAgentId() : -1;
-        for (int i = 0; i < count; i++) {
-            int x = xs[i];
-            int y = ys[i];
-            if (x < minX || x > maxX || y < minY || y > maxY) {
-                continue;
-            }
-            Color color = Color.rgb(0, 255, 0);
-            double screenX = camera.worldToScreenX(x);
-            double screenY = camera.worldToScreenY(y);
-            boolean selected = ids[i] == selectedId;
-            double size = selected ? Math.max(3, tileSize * 1.6) : Math.max(2, tileSize * 0.9);
-            double offset = (tileSize - size) / 2.0;
-            gc.setFill(selected ? Color.LIME : color);
-            gc.fillOval(screenX + offset, screenY + offset, size, size);
-            if (selected) {
-                gc.setStroke(Color.BLACK);
-                gc.setLineWidth(1.2);
-                gc.strokeOval(screenX + offset - 1, screenY + offset - 1, size + 2, size + 2);
-            }
-        }
+    private static int encodeColor(double r, double g, double b, double alpha) {
+        int a = (int) Math.round(Math.max(0, Math.min(1.0, alpha)) * 255.0);
+        int pr = (int) Math.round(Math.max(0, Math.min(1.0, r)) * a);
+        int pg = (int) Math.round(Math.max(0, Math.min(1.0, g)) * a);
+        int pb = (int) Math.round(Math.max(0, Math.min(1.0, b)) * a);
+        return (a << 24) | (pr << 16) | (pg << 8) | pb;
     }
 
-    private Color colorFromArgb(int argb) {
-        int a = (argb >> 24) & 0xFF;
+    private static int applyAlpha(int argb, double alpha) {
+        int a = (int) Math.round(Math.max(0, Math.min(1.0, alpha)) * 255.0);
         int r = (argb >> 16) & 0xFF;
         int g = (argb >> 8) & 0xFF;
         int b = argb & 0xFF;
-        return Color.rgb(r, g, b, a / 255.0);
+        int pr = (int) Math.round(r * (a / 255.0));
+        int pg = (int) Math.round(g * (a / 255.0));
+        int pb = (int) Math.round(b * (a / 255.0));
+        return (a << 24) | (pr << 16) | (pg << 8) | pb;
     }
 }

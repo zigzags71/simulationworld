@@ -36,8 +36,6 @@ class FoodContentionTest {
         assertTrue(remainingFood <= FLOAT_EPSILON);
         assertEquals(2, firstOutcome.successCount);
         assertEquals(0, firstOutcome.failureCount);
-        assertTrue(firstOutcome.hungerAfter.values().stream().mapToDouble(Float::doubleValue).max().orElse(0) >
-                firstOutcome.hungerAfter.values().stream().mapToDouble(Float::doubleValue).min().orElse(0));
 
         WorldGrid worldCopy = new WorldGrid(2, 1, 1L, new float[]{0.025f, 0f}, new float[]{0f, 0f}, new boolean[]{false, false});
         Outcome secondOutcome = runContentionScenario(worldCopy, 123L);

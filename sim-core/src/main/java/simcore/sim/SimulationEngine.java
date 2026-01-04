@@ -2,6 +2,7 @@ package simcore.sim;
 
 import simcore.agents.AgentState;
 import simcore.agents.AgentSystem;
+import simcore.agents.AgentTickMetrics;
 import simcore.config.MapGenConfig;
 import simcore.config.SimConfig;
 import simcore.events.TelemetryBus;
@@ -94,26 +95,27 @@ public class SimulationEngine {
 
     private void step() {
         boolean dirty = applyBrushCommands();
+        AgentTickMetrics metrics = null;
         if (running.get()) {
-            agents.tick(world);
+            metrics = agents.tick(world);
             tickIndex++;
             dirty = true;
         }
         if (dirty) {
             writeSnapshot();
         }
-        if (running.get()) {
-            float meanPredictionError = computeMeanPredictionError(agents.getAgents());
-            telemetryBus.publish(new TelemetryEvent(tickIndex, agents.getAgents().size(), meanPredictionError));
+        if (running.get() && metrics != null) {
+            telemetryBus.publish(new TelemetryEvent(
+                    tickIndex,
+                    metrics.getPopulation(),
+                    metrics.getMeanPredictionError(),
+                    metrics.getDeathsThisTick(),
+                    metrics.getTotalDeaths(),
+                    metrics.getMeanEnergy(),
+                    metrics.getMeanHunger(),
+                    metrics.getMeanStress(),
+                    metrics.getMeanHazard()));
         }
-    }
-
-    private float computeMeanPredictionError(List<AgentState> agentsList) {
-        float sum = 0f;
-        for (AgentState agent : agentsList) {
-            sum += agent.getPredictionError();
-        }
-        return agentsList.isEmpty() ? 0f : sum / agentsList.size();
     }
 
     private void writeSnapshot() {
@@ -128,7 +130,7 @@ public class SimulationEngine {
             back.getAgentY()[index] = agent.getY();
             back.getAgentColorARGB()[index] = ColorUtil.colorFromSeed(agent.getCultureId());
             back.getAgentId()[index] = agent.getId().value();
-            back.getAgentAge()[index] = agent.getAge();
+            back.getAgentAge()[index] = agent.getAgeTicks();
             back.getAgentEnergy()[index] = agent.getEnergy();
             back.getAgentHunger()[index] = agent.getHunger();
             back.getAgentStress()[index] = agent.getStress();

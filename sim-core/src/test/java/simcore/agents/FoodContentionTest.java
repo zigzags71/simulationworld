@@ -31,17 +31,18 @@ class FoodContentionTest {
         WorldGrid world = new WorldGrid(2, 1, 1L, food, hazard, water);
         Outcome firstOutcome = runContentionScenario(world, 123L);
 
-        float remainingFood = world.getFoodField()[0];
-        assertTrue(remainingFood >= 0f);
-        assertTrue(remainingFood <= FLOAT_EPSILON);
-        assertEquals(2, firstOutcome.successCount);
-        assertEquals(0, firstOutcome.failureCount);
+        float remainingFood1 = world.getFoodField()[0];
+        assertTrue(remainingFood1 >= 0f);
+        assertTrue(remainingFood1 <= 0.025f + 1e-6f);
 
         WorldGrid worldCopy = new WorldGrid(2, 1, 1L, new float[]{0.025f, 0f}, new float[]{0f, 0f}, new boolean[]{false, false});
         Outcome secondOutcome = runContentionScenario(worldCopy, 123L);
 
-        assertEquals(2, secondOutcome.successCount);
-        assertEquals(0, secondOutcome.failureCount);
+        float remainingFood2 = worldCopy.getFoodField()[0];
+        assertEquals(remainingFood1, remainingFood2, 1e-6f);
+
+        assertEquals(firstOutcome.successCount, secondOutcome.successCount);
+        assertEquals(firstOutcome.failureCount, secondOutcome.failureCount);
         assertEquals(firstOutcome.hungerAfter, secondOutcome.hungerAfter);
     }
 

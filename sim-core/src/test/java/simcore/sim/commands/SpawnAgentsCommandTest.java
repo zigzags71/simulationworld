@@ -18,7 +18,7 @@ class SpawnAgentsCommandTest {
         int width = 10;
         int height = 10;
         WorldGrid world = flatWorld(width, height, new boolean[width * height]);
-        AgentSystem system = new AgentSystem(world, 99L, 0);
+        AgentSystem system = new AgentSystem(world, 99L, 0, null);
         int spawned = system.spawnAgents(world, 5, 5, 2, 10, new Random(1234));
         assertEquals(10, spawned);
         for (AgentState agent : system.getAgents()) {
@@ -35,7 +35,7 @@ class SpawnAgentsCommandTest {
         boolean[] water = new boolean[width * height];
         water[MathUtil.index(2, 2, width)] = true;
         WorldGrid world = flatWorld(width, height, water);
-        AgentSystem system = new AgentSystem(world, 55L, 0);
+        AgentSystem system = new AgentSystem(world, 55L, 0, null);
         system.spawnAgents(world, 2, 2, 2, 8, new Random(11));
         for (AgentState agent : system.getAgents()) {
             assertTrue(!(agent.getX() == 2 && agent.getY() == 2));
@@ -53,7 +53,7 @@ class SpawnAgentsCommandTest {
         water[MathUtil.index(1, 1, width)] = false;
         water[MathUtil.index(2, 2, width)] = false;
         WorldGrid world = flatWorld(width, height, water);
-        AgentSystem system = new AgentSystem(world, 77L, 0);
+        AgentSystem system = new AgentSystem(world, 77L, 0, null);
         int spawned = system.spawnAgents(world, 2, 2, 2, 5, new Random(33));
         assertEquals(2, spawned);
         assertEquals(2, system.getAgents().size());

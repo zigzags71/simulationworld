@@ -1,6 +1,10 @@
 package simcore.agents;
 
 import simcore.config.SimConfig;
+import simcore.events.AgentDiedEvent;
+import simcore.events.EventBus;
+import simcore.events.RuleExecutedEvent;
+import simcore.events.SimulationEvent;
 import simcore.rules.ActionType;
 import simcore.rules.ContextKey;
 import simcore.rules.OutcomeVector;
@@ -20,17 +24,26 @@ public class AgentSystem {
     private final List<AgentState> agents;
     private final ActionExecutor actionExecutor;
     private final Random random;
+    private final EventBus<SimulationEvent> eventBus;
+    private OutcomeVector[] baseDeltas = new OutcomeVector[0];
+    private OutcomeVector[] actionDeltas = new OutcomeVector[0];
+    private OutcomeVector[] beforeStates = new OutcomeVector[0];
+    private Rule[] chosenRules = new Rule[0];
+    private AgentState[] agentBuffer = new AgentState[0];
+    private float[] hazardBuffer = new float[0];
+    private boolean[] skipBuffer = new boolean[0];
     private long nextId;
     private int totalDeaths;
 
     public AgentSystem(WorldGrid world, long seed) {
-        this(world, seed, SimConfig.NUM_AGENTS);
+        this(world, seed, SimConfig.NUM_AGENTS, null);
     }
 
-    public AgentSystem(WorldGrid world, long seed, int initialPopulation) {
+    public AgentSystem(WorldGrid world, long seed, int initialPopulation, EventBus<SimulationEvent> eventBus) {
         this.random = new Random(seed);
         this.agents = new ArrayList<>(Math.max(initialPopulation, 16));
         this.actionExecutor = new ActionExecutor(new Random(seed + 13));
+        this.eventBus = eventBus;
         this.nextId = 0;
         spawnInitialAgents(world, initialPopulation);
     }
@@ -38,40 +51,84 @@ public class AgentSystem {
     public AgentTickMetrics tick(WorldGrid world, long tickIndex) {
         AgentTickMetrics metrics = new AgentTickMetrics();
         int width = world.getWidth();
-        float[] hazard = world.getHazardField();
         int[] crowding = computeCrowding(width, world.getHeight());
-        for (int i = agents.size() - 1; i >= 0; i--) {
+        int agentCount = agents.size();
+        ensureBuffers(agentCount);
+        actionExecutor.beginTick(agentCount);
+        for (int i = 0; i < agentCount; i++) {
             AgentState agent = agents.get(i);
+            agentBuffer[i] = agent;
+            chosenRules[i] = null;
+            skipBuffer[i] = false;
+            if (agent == null) {
+                skipBuffer[i] = true;
+                continue;
+            }
             ContextKey contextKey = buildContext(agent, world, crowding);
             Rule rule = RuleSelector.choose(RuleSelector.applicable(agent.getRulebook(), contextKey), agent, random);
             if (rule == null) {
+                skipBuffer[i] = true;
                 continue;
             }
-            OutcomeVector before = OutcomeVector.fromAgent(agent.getEnergy(), agent.getHunger(), agent.getStress());
-            OutcomeVector actionDelta = actionExecutor.execute(rule.getAction(), agent, world);
+            chosenRules[i] = rule;
+            beforeStates[i] = OutcomeVector.fromAgent(agent.getEnergy(), agent.getHunger(), agent.getStress());
             int idx = MathUtil.index(agent.getX(), agent.getY(), width);
-            float hazardHere = hazard[idx];
-            OutcomeVector baseDelta = new OutcomeVector(
+            float hazardHere = world.getHazardField()[idx];
+            hazardBuffer[i] = hazardHere;
+            baseDeltas[i] = new OutcomeVector(
                     -SimConfig.ENERGY_DRAIN_PER_TICK - hazardHere * SimConfig.HAZARD_ENERGY_DRAIN_PER_TICK,
                     -SimConfig.HUNGER_DRAIN_PER_TICK,
                     hazardHere * SimConfig.HAZARD_STRESS_GAIN_PER_TICK - SimConfig.STRESS_RECOVERY_PER_TICK);
-            OutcomeVector totalDelta = baseDelta.add(actionDelta);
+            actionDeltas[i] = actionExecutor.execute(rule.getAction(), agent, world, i, tickIndex);
+        }
+        actionExecutor.resolveEatRequests(world, actionDeltas, eventBus);
+        for (int i = agentCount - 1; i >= 0; i--) {
+            if (skipBuffer[i]) {
+                continue;
+            }
+            AgentState agent = agentBuffer[i];
+            Rule rule = chosenRules[i];
+            if (agent == null || rule == null) {
+                continue;
+            }
+            OutcomeVector before = beforeStates[i];
+            OutcomeVector actionDelta = actionDeltas[i] != null ? actionDeltas[i] : OutcomeVector.zero();
+            OutcomeVector totalDelta = baseDeltas[i].add(actionDelta);
             agent.applyTick(totalDelta.getDeltaEnergy(), totalDelta.getDeltaHunger(), totalDelta.getDeltaStress());
             OutcomeVector after = OutcomeVector.fromAgent(agent.getEnergy(), agent.getHunger(), agent.getStress());
             OutcomeVector observed = after.deltaFrom(before);
             float error = observed.distanceTo(rule.getExpected(), false);
             applyTrustUpdate(rule, error, tickIndex);
             agent.updatePredictionError(error);
+            if (eventBus != null && SimConfig.LOG_SELECTED_AGENT_ENABLED) {
+                eventBus.publish(new RuleExecutedEvent(agent.getId().value(), rule.getRuleId(), rule.getAction(), rule.getTrust(),
+                        error, tickIndex));
+            }
             if (agent.isDead()) {
                 agents.remove(i);
                 totalDeaths++;
                 metrics.markDeath();
+                if (eventBus != null && SimConfig.LOG_EVENTS_ENABLED) {
+                    eventBus.publish(new AgentDiedEvent(agent.getId().value(), tickIndex, agent.getX(), agent.getY()));
+                }
                 continue;
             }
-            metrics.accumulate(agent, hazardHere);
+            metrics.accumulate(agent, hazardBuffer[i]);
         }
         metrics.setTotalDeaths(totalDeaths);
         return metrics;
+    }
+
+    private void ensureBuffers(int count) {
+        if (baseDeltas.length < count) {
+            baseDeltas = new OutcomeVector[count];
+            actionDeltas = new OutcomeVector[count];
+            beforeStates = new OutcomeVector[count];
+            chosenRules = new Rule[count];
+            agentBuffer = new AgentState[count];
+            hazardBuffer = new float[count];
+            skipBuffer = new boolean[count];
+        }
     }
 
     private void spawnInitialAgents(WorldGrid world, int initialPopulation) {

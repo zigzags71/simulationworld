@@ -120,11 +120,11 @@ public class CanvasRenderer {
             boolean selected = ids[i] == selectedId;
             double size = selected ? Math.max(3, tileSize * 1.6) : Math.max(2, tileSize * 0.9);
             double offset = (tileSize - size) / 2.0;
-            gc.setFill(selected ? Color.WHITE : color);
+            gc.setFill(selected ? Color.LIME : color);
             gc.fillOval(screenX + offset, screenY + offset, size, size);
             if (selected) {
                 gc.setStroke(Color.BLACK);
-                gc.setLineWidth(1);
+                gc.setLineWidth(1.2);
                 gc.strokeOval(screenX + offset - 1, screenY + offset - 1, size + 2, size + 2);
             }
         }

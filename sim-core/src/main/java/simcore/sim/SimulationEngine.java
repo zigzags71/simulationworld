@@ -5,12 +5,19 @@ import simcore.agents.AgentSystem;
 import simcore.agents.AgentTickMetrics;
 import simcore.config.MapGenConfig;
 import simcore.config.SimConfig;
+import simcore.events.AgentDeselectedEvent;
+import simcore.events.EventBus;
+import simcore.events.SelectedAgentSnapshotEvent;
+import simcore.events.SelectedRegionSnapshotEvent;
+import simcore.events.SimulationEvent;
+import simcore.events.SimulationLogger;
 import simcore.events.TelemetryBus;
 import simcore.events.TelemetryEvent;
 import simcore.rules.Rule;
 import simcore.sim.commands.PlaceFieldBrushCommand;
 import simcore.sim.commands.SpawnAgentsCommand;
 import simcore.sim.commands.SetSelectedAgentCommand;
+import simcore.sim.commands.SetSelectedRegionCommand;
 import simcore.snapshot.RenderSnapshot;
 import simcore.snapshot.RuleView;
 import simcore.snapshot.SelectedAgentDetails;
@@ -33,6 +40,8 @@ public class SimulationEngine {
     private AgentSystem agents;
     private final SnapshotBuffer snapshotBuffer;
     private final TelemetryBus telemetryBus;
+    private final EventBus<SimulationEvent> eventBus;
+    private final SimulationLogger logger;
     private final TickLoop tickLoop;
     private final ExecutorService executorService;
     private final AtomicBoolean running = new AtomicBoolean(false);
@@ -40,8 +49,15 @@ public class SimulationEngine {
     private final ConcurrentLinkedQueue<PlaceFieldBrushCommand> brushQueue = new ConcurrentLinkedQueue<>();
     private final ConcurrentLinkedQueue<SpawnAgentsCommand> spawnQueue = new ConcurrentLinkedQueue<>();
     private final ConcurrentLinkedQueue<SetSelectedAgentCommand> selectionQueue = new ConcurrentLinkedQueue<>();
+    private final ConcurrentLinkedQueue<SetSelectedRegionCommand> regionQueue = new ConcurrentLinkedQueue<>();
     private MapGenConfig mapGenConfig;
     private long selectedAgentId = -1;
+    private int regionStartX = -1;
+    private int regionStartY = -1;
+    private int regionEndX = -1;
+    private int regionEndY = -1;
+    private boolean regionActive;
+    private long lastRegionEventTick = -SimConfig.LOG_THROTTLE_TICKS;
     private long tickIndex = 0;
 
     public SimulationEngine(long seed, TelemetryBus telemetryBus) {
@@ -51,9 +67,11 @@ public class SimulationEngine {
     public SimulationEngine(MapGenConfig mapGenConfig, TelemetryBus telemetryBus) {
         this.mapGenConfig = mapGenConfig;
         this.world = WorldGrid.generate(mapGenConfig);
-        this.agents = new AgentSystem(world, mapGenConfig.getSeed() + 99);
+        this.eventBus = new EventBus<>();
+        this.agents = new AgentSystem(world, mapGenConfig.getSeed() + 99, SimConfig.NUM_AGENTS, eventBus);
         this.snapshotBuffer = new SnapshotBuffer(SimConfig.WORLD_W, SimConfig.WORLD_H, SimConfig.MAX_RENDERED_AGENTS);
         this.telemetryBus = telemetryBus;
+        this.logger = new SimulationLogger(eventBus, this::getSelectedAgentId);
         this.tickLoop = new TickLoop(SimConfig.TICK_RATE, this::step);
         this.executorService = Executors.newSingleThreadExecutor(r -> new Thread(r, "sim-tick"));
         writeSnapshot();
@@ -88,12 +106,15 @@ public class SimulationEngine {
         running.set(false);
         this.mapGenConfig = newConfig;
         this.world = WorldGrid.generate(newConfig);
-        this.agents = new AgentSystem(world, newConfig.getSeed() + 99);
+        this.agents = new AgentSystem(world, newConfig.getSeed() + 99, SimConfig.NUM_AGENTS, eventBus);
         this.tickIndex = 0;
         brushQueue.clear();
         spawnQueue.clear();
         selectionQueue.clear();
+        regionQueue.clear();
         selectedAgentId = -1;
+        regionActive = false;
+        lastRegionEventTick = -SimConfig.LOG_THROTTLE_TICKS;
         writeSnapshot();
     }
 
@@ -113,15 +134,27 @@ public class SimulationEngine {
         selectionQueue.add(command);
     }
 
+    public void queueSelectedRegionCommand(SetSelectedRegionCommand command) {
+        regionQueue.add(command);
+    }
+
     private void step() {
         boolean dirty = applyBrushCommands();
         dirty |= applySpawnCommands();
         dirty |= applySelectionCommands();
+        dirty |= applyRegionCommands();
         AgentTickMetrics metrics = null;
+        long currentTick = tickIndex;
         if (running.get()) {
-            metrics = agents.tick(world, tickIndex);
+            metrics = agents.tick(world, currentTick);
             tickIndex++;
             dirty = true;
+            dirty |= ensureSelectionValid(currentTick);
+            emitSelectedAgentSnapshot(currentTick);
+            emitRegionSnapshot(currentTick);
+        }
+        if (!running.get() && selectedAgentId >= 0) {
+            emitSelectedAgentSnapshot(currentTick);
         }
         if (dirty) {
             writeSnapshot();
@@ -138,6 +171,58 @@ public class SimulationEngine {
                     metrics.getMeanStress(),
                     metrics.getMeanHazard()));
         }
+    }
+
+    private void emitSelectedAgentSnapshot(long currentTick) {
+        if (!SimConfig.LOG_SELECTED_AGENT_ENABLED || selectedAgentId < 0) {
+            return;
+        }
+        AgentState agent = agents.findAgentById(selectedAgentId);
+        if (agent != null) {
+            eventBus.publish(new SelectedAgentSnapshotEvent(agent.getId().value(), agent.getEnergy(), agent.getHunger(),
+                    agent.getStress(), agent.getPredictionError(), currentTick));
+        }
+    }
+
+    private void emitRegionSnapshot(long currentTick) {
+        if (!SimConfig.LOG_SELECTED_REGION_ENABLED || !regionActive) {
+            return;
+        }
+        if (currentTick - lastRegionEventTick < SimConfig.LOG_THROTTLE_TICKS) {
+            return;
+        }
+        lastRegionEventTick = currentTick;
+        int minX = Math.min(regionStartX, regionEndX);
+        int maxX = Math.max(regionStartX, regionEndX);
+        int minY = Math.min(regionStartY, regionEndY);
+        int maxY = Math.max(regionStartY, regionEndY);
+        minX = Math.max(0, Math.min(minX, world.getWidth() - 1));
+        maxX = Math.max(0, Math.min(maxX, world.getWidth() - 1));
+        minY = Math.max(0, Math.min(minY, world.getHeight() - 1));
+        maxY = Math.max(0, Math.min(maxY, world.getHeight() - 1));
+        List<AgentState> agentStates = agents.getAgents();
+        float energySum = 0f;
+        float hungerSum = 0f;
+        float stressSum = 0f;
+        float errorSum = 0f;
+        int count = 0;
+        for (AgentState agent : agentStates) {
+            int x = agent.getX();
+            int y = agent.getY();
+            if (x >= minX && x <= maxX && y >= minY && y <= maxY) {
+                energySum += agent.getEnergy();
+                hungerSum += agent.getHunger();
+                stressSum += agent.getStress();
+                errorSum += agent.getPredictionError();
+                count++;
+            }
+        }
+        float avgEnergy = count == 0 ? 0f : energySum / count;
+        float avgHunger = count == 0 ? 0f : hungerSum / count;
+        float avgStress = count == 0 ? 0f : stressSum / count;
+        float avgError = count == 0 ? 0f : errorSum / count;
+        eventBus.publish(new SelectedRegionSnapshotEvent(minX, minY, maxX, maxY, count, avgEnergy, avgHunger, avgStress,
+                avgError, currentTick));
     }
 
     private void writeSnapshot() {
@@ -196,6 +281,22 @@ public class SimulationEngine {
         return telemetryBus;
     }
 
+    AgentSystem getAgentSystem() {
+        return agents;
+    }
+
+    long getSelectedAgentIdValue() {
+        return selectedAgentId;
+    }
+
+    void stepOnce() {
+        step();
+    }
+
+    private long getSelectedAgentId() {
+        return selectedAgentId;
+    }
+
     private boolean applyBrushCommands() {
         boolean changed = false;
         PlaceFieldBrushCommand command;
@@ -227,6 +328,33 @@ public class SimulationEngine {
             changed = true;
         }
         return changed;
+    }
+
+    private boolean applyRegionCommands() {
+        boolean changed = false;
+        SetSelectedRegionCommand command;
+        while ((command = regionQueue.poll()) != null) {
+            regionStartX = command.getStartX();
+            regionStartY = command.getStartY();
+            regionEndX = command.getEndX();
+            regionEndY = command.getEndY();
+            regionActive = regionStartX >= 0 && regionStartY >= 0 && regionEndX >= 0 && regionEndY >= 0;
+            changed = true;
+        }
+        return changed;
+    }
+
+    private boolean ensureSelectionValid(long currentTick) {
+        if (selectedAgentId < 0) {
+            return false;
+        }
+        AgentState agent = agents.findAgentById(selectedAgentId);
+        if (agent == null) {
+            selectedAgentId = -1;
+            eventBus.publish(new AgentDeselectedEvent(currentTick));
+            return true;
+        }
+        return false;
     }
 
     private SelectedAgentDetails buildSelectedAgentDetails(AgentState agent) {

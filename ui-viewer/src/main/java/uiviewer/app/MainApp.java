@@ -22,6 +22,7 @@ import simcore.sim.commands.BrushType;
 import simcore.sim.commands.PlaceFieldBrushCommand;
 import simcore.sim.commands.SpawnAgentsCommand;
 import simcore.sim.commands.SetSelectedAgentCommand;
+import simcore.sim.commands.SetSelectedRegionCommand;
 import simcore.snapshot.RenderSnapshot;
 import simcore.util.MathUtil;
 import uiviewer.config.UIConfig;
@@ -152,10 +153,12 @@ public class MainApp extends Application {
             selectionState.clearTile();
             selectionState.clearAgent();
             engine.queueSelectedAgentCommand(new SetSelectedAgentCommand(-1));
+            engine.queueSelectedRegionCommand(new SetSelectedRegionCommand(-1, -1, -1, -1));
             tileHoverPanel.clearSelection();
             agentInspectorPanel.clear();
             regionInspectorPanel.clear();
         });
+        regionInspectorPanel.setOnAgentSelected(this::selectAgentFromRegionList);
         box.getChildren().addAll(tileHoverPanel, agentInspectorPanel, regionInspectorPanel);
         VBox.setVgrow(agentInspectorPanel, Priority.ALWAYS);
         VBox.setVgrow(regionInspectorPanel, Priority.ALWAYS);
@@ -429,7 +432,39 @@ public class MainApp extends Application {
         long closestId = findAgentAt(snapshot, tileX, tileY, worldX, worldY);
         selectionState.setSelectedAgentId(closestId);
         engine.queueSelectedAgentCommand(new SetSelectedAgentCommand(closestId));
+        sendRegionSelection();
         agentInspectorPanel.update(snapshot, closestId);
+    }
+
+    private void selectAgentFromRegionList(long agentId) {
+        selectionState.setSelectedAgentId(agentId);
+        engine.queueSelectedAgentCommand(new SetSelectedAgentCommand(agentId));
+        RenderSnapshot snapshot = engine.getLatestSnapshot();
+        if (snapshot != null) {
+            int count = snapshot.getAgentCount();
+            long[] ids = snapshot.getAgentId();
+            int[] xs = snapshot.getAgentX();
+            int[] ys = snapshot.getAgentY();
+            for (int i = 0; i < count; i++) {
+                if (ids[i] == agentId) {
+                    selectionState.setSelectedTile(xs[i], ys[i]);
+                    int idx = MathUtil.index(xs[i], ys[i], snapshot.getWidth());
+                    tileHoverPanel.updateSelection(xs[i], ys[i], snapshot.getFood()[idx], snapshot.getHazard()[idx],
+                            snapshot.getCrowding()[idx], snapshot.getAgentCounts()[idx]);
+                    break;
+                }
+            }
+            agentInspectorPanel.update(snapshot, agentId);
+        }
+    }
+
+    private void sendRegionSelection() {
+        if (selectionState.hasRegion()) {
+            engine.queueSelectedRegionCommand(new SetSelectedRegionCommand(selectionState.getRegionStartX(),
+                    selectionState.getRegionStartY(), selectionState.getRegionEndX(), selectionState.getRegionEndY()));
+        } else {
+            engine.queueSelectedRegionCommand(new SetSelectedRegionCommand(-1, -1, -1, -1));
+        }
     }
 
     private double extractCanvasWidth(ScrollEvent event) {
@@ -489,6 +524,7 @@ public class MainApp extends Application {
         selectionState.clearTile();
         selectionState.clearAgent();
         selectionState.clearRegion();
+        sendRegionSelection();
         tileHoverPanel.clearSelection();
         agentInspectorPanel.clear();
         regionInspectorPanel.clear();

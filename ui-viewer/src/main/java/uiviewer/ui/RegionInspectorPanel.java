@@ -12,6 +12,7 @@ import uiviewer.render.SelectionState;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.LongConsumer;
 
 public class RegionInspectorPanel extends VBox {
     private final Label regionLabel = new Label("Region: none");
@@ -23,6 +24,7 @@ public class RegionInspectorPanel extends VBox {
     private final Label extraLabel = new Label("");
     private final ListView<String> agentList = new ListView<>();
     private Runnable clearHandler;
+    private LongConsumer agentSelectionHandler;
 
     public RegionInspectorPanel() {
         setSpacing(6);
@@ -36,6 +38,14 @@ public class RegionInspectorPanel extends VBox {
             }
             clear();
         });
+        agentList.getSelectionModel().selectedItemProperty().addListener((obs, old, val) -> {
+            if (val != null && agentSelectionHandler != null) {
+                try {
+                    agentSelectionHandler.accept(Long.parseLong(val));
+                } catch (NumberFormatException ignored) {
+                }
+            }
+        });
         HBox header = new HBox(8, new Label("Region Inspector"), clearButton);
         getChildren().addAll(header, regionLabel, countLabel, energyLabel, hungerLabel, stressLabel, predictionLabel, extraLabel,
                 new Label("Agent IDs"), agentList);
@@ -43,6 +53,10 @@ public class RegionInspectorPanel extends VBox {
 
     public void setOnClearSelection(Runnable handler) {
         this.clearHandler = handler;
+    }
+
+    public void setOnAgentSelected(LongConsumer handler) {
+        this.agentSelectionHandler = handler;
     }
 
     public void clear() {
@@ -53,6 +67,7 @@ public class RegionInspectorPanel extends VBox {
         stressLabel.setText("Avg Stress: --");
         predictionLabel.setText("Avg Prediction Error: --");
         agentList.getItems().clear();
+        agentList.getSelectionModel().clearSelection();
         extraLabel.setText("");
     }
 
@@ -112,7 +127,11 @@ public class RegionInspectorPanel extends VBox {
             stressLabel.setText("Avg Stress: --");
             predictionLabel.setText("Avg Prediction Error: --");
         }
+        String selected = agentList.getSelectionModel().getSelectedItem();
         agentList.getItems().setAll(listed);
+        if (selected != null && listed.contains(selected)) {
+            agentList.getSelectionModel().select(selected);
+        }
         int remaining = agentsInRegion - listed.size();
         extraLabel.setText(remaining > 0 ? "+" + remaining + " more" : "");
     }

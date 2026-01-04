@@ -53,6 +53,11 @@ public final class SimConfig {
 
     public static final float CROWDING_MAX_EXPECTED = 6f;
 
+    public static boolean LOG_EVENTS_ENABLED = false;
+    public static boolean LOG_SELECTED_AGENT_ENABLED = false;
+    public static boolean LOG_SELECTED_REGION_ENABLED = false;
+    public static int LOG_THROTTLE_TICKS = 20;
+
     private SimConfig() {
     }
 }

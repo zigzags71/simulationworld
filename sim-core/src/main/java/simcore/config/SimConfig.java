@@ -35,8 +35,23 @@ public final class SimConfig {
     public static final float FOOD_TO_HUNGER_GAIN = 0.8f;
     public static final float FOOD_TO_ENERGY_GAIN = 0.3f;
 
-    public static final float PREDICTION_ERROR_JITTER = 0.0015f;
-    public static final float AWARENESS_THRESHOLD = 0.7f;
+    public static final float RULE_MATCH_DISTANCE = 1.0f;
+    public static final float TRUST_ALPHA = 2.0f;
+    public static final float TRUST_EPSILON = 0.05f;
+    public static final float TRUST_LEARN_UP = 0.02f;
+    public static final float TRUST_LEARN_DOWN = 0.03f;
+    public static final float ERROR_SUCCESS_THRESHOLD = 0.05f;
+    public static final float PRED_ERROR_EMA_ALPHA = 0.1f;
+    public static final float RULE_NEED_UTILITY_WEIGHT = 0.5f;
+
+    public static final float MOVE_FOOD_WEIGHT = 1.0f;
+    public static final float MOVE_HAZARD_WEIGHT = 0.8f;
+    public static final float MOVE_ENERGY_COST = 0.0006f;
+    public static final float MOVE_HUNGER_COST = 0.0005f;
+
+    public static final float IDLE_STRESS_RECOVERY_BONUS = 0.0002f;
+
+    public static final float CROWDING_MAX_EXPECTED = 6f;
 
     private SimConfig() {
     }

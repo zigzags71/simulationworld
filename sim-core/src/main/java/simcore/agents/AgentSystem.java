@@ -1,6 +1,13 @@
 package simcore.agents;
 
 import simcore.config.SimConfig;
+import simcore.rules.ActionType;
+import simcore.rules.ContextKey;
+import simcore.rules.OutcomeVector;
+import simcore.rules.Rule;
+import simcore.rules.RuleSelector;
+import simcore.rules.RuleType;
+import simcore.util.BinningUtil;
 import simcore.util.MathUtil;
 import simcore.world.WorldGrid;
 
@@ -11,8 +18,7 @@ import java.util.Random;
 
 public class AgentSystem {
     private final List<AgentState> agents;
-    private final MovementPolicy movementPolicy;
-    private final NourishmentPolicy nourishmentPolicy;
+    private final ActionExecutor actionExecutor;
     private final Random random;
     private long nextId;
     private int totalDeaths;
@@ -24,27 +30,38 @@ public class AgentSystem {
     public AgentSystem(WorldGrid world, long seed, int initialPopulation) {
         this.random = new Random(seed);
         this.agents = new ArrayList<>(Math.max(initialPopulation, 16));
-        this.movementPolicy = new RandomWalkMovement(seed + 7);
-        this.nourishmentPolicy = new BasicNourishmentPolicy();
+        this.actionExecutor = new ActionExecutor(new Random(seed + 13));
         this.nextId = 0;
         spawnInitialAgents(world, initialPopulation);
     }
 
-    public AgentTickMetrics tick(WorldGrid world) {
+    public AgentTickMetrics tick(WorldGrid world, long tickIndex) {
         AgentTickMetrics metrics = new AgentTickMetrics();
         int width = world.getWidth();
         float[] hazard = world.getHazardField();
+        int[] crowding = computeCrowding(width, world.getHeight());
         for (int i = agents.size() - 1; i >= 0; i--) {
             AgentState agent = agents.get(i);
-            movementPolicy.move(agent, world);
+            ContextKey contextKey = buildContext(agent, world, crowding);
+            Rule rule = RuleSelector.choose(RuleSelector.applicable(agent.getRulebook(), contextKey), agent, random);
+            if (rule == null) {
+                continue;
+            }
+            OutcomeVector before = OutcomeVector.fromAgent(agent.getEnergy(), agent.getHunger(), agent.getStress());
+            OutcomeVector actionDelta = actionExecutor.execute(rule.getAction(), agent, world);
             int idx = MathUtil.index(agent.getX(), agent.getY(), width);
             float hazardHere = hazard[idx];
-            float energyDelta = -SimConfig.ENERGY_DRAIN_PER_TICK - hazardHere * SimConfig.HAZARD_ENERGY_DRAIN_PER_TICK;
-            float hungerDelta = -SimConfig.HUNGER_DRAIN_PER_TICK;
-            float stressDelta = hazardHere * SimConfig.HAZARD_STRESS_GAIN_PER_TICK - SimConfig.STRESS_RECOVERY_PER_TICK;
-            float predictionDelta = (random.nextFloat() - 0.5f) * SimConfig.PREDICTION_ERROR_JITTER;
-            agent.applyTick(energyDelta, hungerDelta, stressDelta, predictionDelta);
-            nourishmentPolicy.applyNutrition(agent, world);
+            OutcomeVector baseDelta = new OutcomeVector(
+                    -SimConfig.ENERGY_DRAIN_PER_TICK - hazardHere * SimConfig.HAZARD_ENERGY_DRAIN_PER_TICK,
+                    -SimConfig.HUNGER_DRAIN_PER_TICK,
+                    hazardHere * SimConfig.HAZARD_STRESS_GAIN_PER_TICK - SimConfig.STRESS_RECOVERY_PER_TICK);
+            OutcomeVector totalDelta = baseDelta.add(actionDelta);
+            agent.applyTick(totalDelta.getDeltaEnergy(), totalDelta.getDeltaHunger(), totalDelta.getDeltaStress());
+            OutcomeVector after = OutcomeVector.fromAgent(agent.getEnergy(), agent.getHunger(), agent.getStress());
+            OutcomeVector observed = after.deltaFrom(before);
+            float error = observed.distanceTo(rule.getExpected(), false);
+            applyTrustUpdate(rule, error, tickIndex);
+            agent.updatePredictionError(error);
             if (agent.isDead()) {
                 agents.remove(i);
                 totalDeaths++;
@@ -67,6 +84,7 @@ public class AgentSystem {
             int y = random.nextInt(h);
             if (!water[MathUtil.index(x, y, w)]) {
                 AgentState agent = new AgentState(new AgentId(nextId++), x, y, SimConfig.INITIAL_ENERGY, spawned);
+                seedRules(agent, world, new int[w * h]);
                 agents.add(agent);
                 spawned++;
             }
@@ -109,6 +127,7 @@ public class AgentSystem {
             int x = idx % width;
             int y = idx / width;
             AgentState agent = new AgentState(new AgentId(nextId++), x, y, SimConfig.INITIAL_ENERGY, cultureBase + spawned);
+            seedRules(agent, world, new int[width * height]);
             agents.add(agent);
             spawned++;
         }
@@ -126,5 +145,56 @@ public class AgentSystem {
             }
         }
         return null;
+    }
+
+    private int[] computeCrowding(int width, int height) {
+        int[] counts = new int[width * height];
+        for (AgentState agent : agents) {
+            counts[MathUtil.index(agent.getX(), agent.getY(), width)] += 1;
+        }
+        return counts;
+    }
+
+    private ContextKey buildContext(AgentState agent, WorldGrid world, int[] crowding) {
+        int width = world.getWidth();
+        int idx = MathUtil.index(agent.getX(), agent.getY(), width);
+        int bins = SimConfig.FIELD_BIN_COUNT;
+        int hungerBin = BinningUtil.bin01(agent.getHunger(), bins);
+        int energyBin = BinningUtil.bin01(agent.getEnergy(), bins);
+        int stressBin = BinningUtil.bin01(agent.getStress(), bins);
+        int foodBin = BinningUtil.bin01(world.getFoodField()[idx], bins);
+        int hazardBin = BinningUtil.bin01(world.getHazardField()[idx], bins);
+        float crowdNorm = Math.min(1f, crowding[idx] / SimConfig.CROWDING_MAX_EXPECTED);
+        int crowdBin = BinningUtil.bin01(crowdNorm, bins);
+        int awareness = 0;
+        int affordance = world.getFoodField()[idx] >= SimConfig.FOOD_MIN_TO_EAT ? 1 : 0;
+        return new ContextKey(hungerBin, energyBin, stressBin, foodBin, hazardBin, crowdBin, awareness, affordance);
+    }
+
+    private void seedRules(AgentState agent, WorldGrid world, int[] crowding) {
+        ContextKey contextKey = buildContext(agent, world, crowding);
+        OutcomeVector idleExpected = new OutcomeVector(-SimConfig.ENERGY_DRAIN_PER_TICK,
+                -SimConfig.HUNGER_DRAIN_PER_TICK, -SimConfig.STRESS_RECOVERY_PER_TICK - SimConfig.IDLE_STRESS_RECOVERY_BONUS);
+        OutcomeVector moveExpected = new OutcomeVector(-SimConfig.ENERGY_DRAIN_PER_TICK - SimConfig.MOVE_ENERGY_COST,
+                -SimConfig.HUNGER_DRAIN_PER_TICK - SimConfig.MOVE_HUNGER_COST, -SimConfig.STRESS_RECOVERY_PER_TICK);
+        OutcomeVector eatExpected = new OutcomeVector(SimConfig.FOOD_TO_ENERGY_GAIN * SimConfig.FOOD_CONSUME_RATE,
+                SimConfig.FOOD_TO_HUNGER_GAIN * SimConfig.FOOD_CONSUME_RATE, -SimConfig.STRESS_RECOVERY_PER_TICK * 0.5f);
+        agent.addRule(new Rule(agent.allocateRuleId(), RuleType.NORMAL, contextKey, ActionType.IDLE, idleExpected, 0.8f));
+        agent.addRule(new Rule(agent.allocateRuleId(), RuleType.NORMAL, contextKey, ActionType.MOVE, moveExpected, 0.5f));
+        agent.addRule(new Rule(agent.allocateRuleId(), RuleType.NORMAL, contextKey, ActionType.EAT, eatExpected, 0.5f));
+    }
+
+    void applyTrustUpdate(Rule rule, float error, long tickIndex) {
+        rule.incrementUses();
+        rule.setLastUsedTick(tickIndex);
+        rule.setLastError(error);
+        if (error < SimConfig.ERROR_SUCCESS_THRESHOLD) {
+            rule.incrementSuccesses();
+            float improved = rule.getTrust() + SimConfig.TRUST_LEARN_UP * (1f - rule.getTrust());
+            rule.setTrust(MathUtil.clamp01(improved));
+        } else {
+            float degraded = rule.getTrust() - SimConfig.TRUST_LEARN_DOWN * error * rule.getTrust();
+            rule.setTrust(MathUtil.clamp01(degraded));
+        }
     }
 }

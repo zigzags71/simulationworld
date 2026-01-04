@@ -21,6 +21,7 @@ import simcore.sim.SimulationEngine;
 import simcore.sim.commands.BrushType;
 import simcore.sim.commands.PlaceFieldBrushCommand;
 import simcore.sim.commands.SpawnAgentsCommand;
+import simcore.sim.commands.SetSelectedAgentCommand;
 import simcore.snapshot.RenderSnapshot;
 import simcore.util.MathUtil;
 import uiviewer.config.UIConfig;
@@ -85,6 +86,7 @@ public class MainApp extends Application {
                 super.handle(now);
                 monitorBar.markFrameRendered(now);
                 regionInspectorPanel.update(engine.getLatestSnapshot(), selectionState);
+                agentInspectorPanel.update(engine.getLatestSnapshot(), selectionState.getSelectedAgentId());
             }
         };
 
@@ -149,6 +151,7 @@ public class MainApp extends Application {
             selectionState.clearRegion();
             selectionState.clearTile();
             selectionState.clearAgent();
+            engine.queueSelectedAgentCommand(new SetSelectedAgentCommand(-1));
             tileHoverPanel.clearSelection();
             agentInspectorPanel.clear();
             regionInspectorPanel.clear();
@@ -425,6 +428,7 @@ public class MainApp extends Application {
         double worldY = camera.screenToWorldY(event.getY());
         long closestId = findAgentAt(snapshot, tileX, tileY, worldX, worldY);
         selectionState.setSelectedAgentId(closestId);
+        engine.queueSelectedAgentCommand(new SetSelectedAgentCommand(closestId));
         agentInspectorPanel.update(snapshot, closestId);
     }
 

@@ -7,9 +7,13 @@ import simcore.config.MapGenConfig;
 import simcore.config.SimConfig;
 import simcore.events.TelemetryBus;
 import simcore.events.TelemetryEvent;
+import simcore.rules.Rule;
 import simcore.sim.commands.PlaceFieldBrushCommand;
 import simcore.sim.commands.SpawnAgentsCommand;
+import simcore.sim.commands.SetSelectedAgentCommand;
 import simcore.snapshot.RenderSnapshot;
+import simcore.snapshot.RuleView;
+import simcore.snapshot.SelectedAgentDetails;
 import simcore.snapshot.SnapshotBuffer;
 import simcore.util.ColorUtil;
 import simcore.util.FieldBrushApplier;
@@ -35,7 +39,9 @@ public class SimulationEngine {
     private final AtomicBoolean loopStarted = new AtomicBoolean(false);
     private final ConcurrentLinkedQueue<PlaceFieldBrushCommand> brushQueue = new ConcurrentLinkedQueue<>();
     private final ConcurrentLinkedQueue<SpawnAgentsCommand> spawnQueue = new ConcurrentLinkedQueue<>();
+    private final ConcurrentLinkedQueue<SetSelectedAgentCommand> selectionQueue = new ConcurrentLinkedQueue<>();
     private MapGenConfig mapGenConfig;
+    private long selectedAgentId = -1;
     private long tickIndex = 0;
 
     public SimulationEngine(long seed, TelemetryBus telemetryBus) {
@@ -86,6 +92,8 @@ public class SimulationEngine {
         this.tickIndex = 0;
         brushQueue.clear();
         spawnQueue.clear();
+        selectionQueue.clear();
+        selectedAgentId = -1;
         writeSnapshot();
     }
 
@@ -101,12 +109,17 @@ public class SimulationEngine {
         spawnQueue.add(command);
     }
 
+    public void queueSelectedAgentCommand(SetSelectedAgentCommand command) {
+        selectionQueue.add(command);
+    }
+
     private void step() {
         boolean dirty = applyBrushCommands();
         dirty |= applySpawnCommands();
+        dirty |= applySelectionCommands();
         AgentTickMetrics metrics = null;
         if (running.get()) {
-            metrics = agents.tick(world);
+            metrics = agents.tick(world, tickIndex);
             tickIndex++;
             dirty = true;
         }
@@ -135,6 +148,7 @@ public class SimulationEngine {
         List<AgentState> agentStates = agents.getAgents();
         int index = 0;
         int capacity = back.getAgentX().length;
+        SelectedAgentDetails selectedDetails = null;
         for (AgentState agent : agentStates) {
             if (index >= capacity) {
                 break;
@@ -152,6 +166,9 @@ public class SimulationEngine {
             back.getAgentCultureId()[index] = agent.getCultureId();
             int idx = MathUtil.index(agent.getX(), agent.getY(), world.getWidth());
             back.getAgentCounts()[idx] += 1;
+            if (agent.getId().value() == selectedAgentId) {
+                selectedDetails = buildSelectedAgentDetails(agent);
+            }
             index++;
         }
         for (int i = index; i < capacity; i++) {
@@ -171,6 +188,7 @@ public class SimulationEngine {
             back.getCrowding()[i] = back.getAgentCounts()[i] / 5f;
         }
         snapshotBuffer.setAgentCount(Math.min(agentStates.size(), capacity));
+        snapshotBuffer.setSelectedAgentDetails(selectedDetails);
         snapshotBuffer.publish(tickIndex);
     }
 
@@ -199,5 +217,27 @@ public class SimulationEngine {
             changed |= spawned > 0;
         }
         return changed;
+    }
+
+    private boolean applySelectionCommands() {
+        boolean changed = false;
+        SetSelectedAgentCommand command;
+        while ((command = selectionQueue.poll()) != null) {
+            selectedAgentId = command.getAgentId();
+            changed = true;
+        }
+        return changed;
+    }
+
+    private SelectedAgentDetails buildSelectedAgentDetails(AgentState agent) {
+        List<Rule> rules = agent.getRulebook();
+        RuleView[] views = new RuleView[rules.size()];
+        for (int i = 0; i < rules.size(); i++) {
+            Rule rule = rules.get(i);
+            views[i] = new RuleView(rule.getRuleId(), rule.getType(), rule.getContextKey().toString(), rule.getAction(),
+                    rule.getTrust(), rule.getUses(), rule.getSuccesses(), rule.getLastUsedTick(), rule.getLastError());
+        }
+        return new SelectedAgentDetails(agent.getId().value(), agent.getX(), agent.getY(), agent.getAgeTicks(), agent.getEnergy(), agent.getHunger(),
+                agent.getStress(), agent.getPredictionError(), agent.isAwarenessFlag(), views);
     }
 }

@@ -21,6 +21,7 @@ public class SnapshotBuffer {
     private final int[] backAgentCulture;
     private final int[] backAgentCounts;
     private int backAgentCount;
+    private SelectedAgentDetails selectedAgentDetails;
 
     public SnapshotBuffer(int width, int height, int maxAgents) {
         backFood = new float[width * height];
@@ -41,7 +42,7 @@ public class SnapshotBuffer {
         backAgentCount = 0;
         back = new RenderSnapshot(width, height, backFood, backHazard, backCrowding, backAgentX, backAgentY, backAgentColor, backAgentIds,
                 backAgentAge, backAgentEnergy, backAgentHunger, backAgentStress, backAgentPredictionError, backAgentAwareness,
-                backAgentCulture, backAgentCounts, backAgentCount, 0);
+                backAgentCulture, backAgentCounts, backAgentCount, 0, null);
         front = new AtomicReference<>(back);
     }
 
@@ -57,10 +58,14 @@ public class SnapshotBuffer {
         this.backAgentCount = count;
     }
 
+    public void setSelectedAgentDetails(SelectedAgentDetails selectedAgentDetails) {
+        this.selectedAgentDetails = selectedAgentDetails;
+    }
+
     public void publish(long tickIndex) {
         RenderSnapshot updated = new RenderSnapshot(back.getWidth(), back.getHeight(), backFood, backHazard, backCrowding,
                 backAgentX, backAgentY, backAgentColor, backAgentIds, backAgentAge, backAgentEnergy, backAgentHunger, backAgentStress,
-                backAgentPredictionError, backAgentAwareness, backAgentCulture, backAgentCounts, backAgentCount, tickIndex);
+                backAgentPredictionError, backAgentAwareness, backAgentCulture, backAgentCounts, backAgentCount, tickIndex, selectedAgentDetails);
         front.set(updated);
     }
 }

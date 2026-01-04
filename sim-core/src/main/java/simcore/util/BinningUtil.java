@@ -12,4 +12,8 @@ public final class BinningUtil {
         int bin = (int) (clamped * binCount);
         return Math.min(binCount - 1, bin);
     }
+
+    public static int bin01(float value, int bins) {
+        return toBin(value, bins);
+    }
 }

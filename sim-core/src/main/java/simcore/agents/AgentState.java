@@ -1,7 +1,12 @@
 package simcore.agents;
 
 import simcore.config.SimConfig;
+import simcore.rules.Rule;
 import simcore.util.MathUtil;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 public class AgentState {
     private final AgentId id;
@@ -12,8 +17,10 @@ public class AgentState {
     private float hunger;
     private float stress;
     private float predictionError;
-    private boolean awarenessFlag;
+    private final boolean awarenessFlag;
     private int cultureId;
+    private final List<Rule> rulebook;
+    private long nextRuleId;
 
     public AgentState(AgentId id, int x, int y, float energy, int cultureId) {
         this.id = id;
@@ -26,6 +33,8 @@ public class AgentState {
         this.predictionError = 0f;
         this.awarenessFlag = false;
         this.cultureId = cultureId;
+        this.rulebook = new ArrayList<>();
+        this.nextRuleId = 1;
     }
 
     public AgentId getId() {
@@ -68,15 +77,28 @@ public class AgentState {
         return cultureId;
     }
 
-    public void applyTick(float energyDelta, float hungerDelta, float stressDelta, float predictionDelta) {
+    public List<Rule> getRulebook() {
+        return Collections.unmodifiableList(rulebook);
+    }
+
+    public void addRule(Rule rule) {
+        this.rulebook.add(rule);
+    }
+
+    public long allocateRuleId() {
+        return nextRuleId++;
+    }
+
+    public void applyTick(float energyDelta, float hungerDelta, float stressDelta) {
         this.ageTicks += 1;
         this.energy = clampMetric(energy + energyDelta);
         this.hunger = clampMetric(hunger + hungerDelta);
         this.stress = clampMetric(stress + stressDelta);
-        this.predictionError = clampMetric(predictionError + predictionDelta);
-        if (predictionError > SimConfig.AWARENESS_THRESHOLD) {
-            awarenessFlag = true;
-        }
+    }
+
+    public void updatePredictionError(float observedError) {
+        float alpha = MathUtil.clamp01(SimConfig.PRED_ERROR_EMA_ALPHA);
+        this.predictionError = clampMetric((1f - alpha) * predictionError + alpha * observedError);
     }
 
     public void moveTo(int newX, int newY) {

@@ -62,6 +62,7 @@ public class CanvasRenderer {
         double destH = viewHeight * camera.getZoom();
         gc.drawImage(viewportImage, destX, destY, destW, destH);
 
+        drawEmitters(gc, camera, snapshot, canvasWidth, canvasHeight);
         drawSelection(gc, camera, selectionState);
     }
 
@@ -148,6 +149,31 @@ public class CanvasRenderer {
             double sx = camera.worldToScreenX(selectionState.getSelectedTileX());
             double sy = camera.worldToScreenY(selectionState.getSelectedTileY());
             gc.strokeRect(sx, sy, tileSize, tileSize);
+        }
+    }
+
+    private void drawEmitters(GraphicsContext gc, Camera camera, RenderSnapshot snapshot, double canvasWidth, double canvasHeight) {
+        int count = snapshot.getEmitterCount();
+        if (count <= 0) {
+            return;
+        }
+        int[] xs = snapshot.getEmitterX();
+        int[] ys = snapshot.getEmitterY();
+        boolean[] enabled = snapshot.getEmitterEnabled();
+        double tileSize = camera.getZoom();
+        double inset = Math.min(tileSize * 0.2, tileSize * 0.45);
+        for (int i = 0; i < count; i++) {
+            double sx = camera.worldToScreenX(xs[i]);
+            double sy = camera.worldToScreenY(ys[i]);
+            if (sx > canvasWidth || sy > canvasHeight || sx + tileSize < 0 || sy + tileSize < 0) {
+                continue;
+            }
+            Color color = enabled[i] ? Color.ORANGE : Color.DARKGRAY;
+            gc.setFill(color.deriveColor(0, 1, 1, 0.65));
+            gc.setStroke(color); 
+            gc.setLineWidth(Math.max(1.0, tileSize * 0.08));
+            gc.fillOval(sx + inset, sy + inset, tileSize - inset * 2, tileSize - inset * 2);
+            gc.strokeOval(sx + inset, sy + inset, tileSize - inset * 2, tileSize - inset * 2);
         }
     }
 

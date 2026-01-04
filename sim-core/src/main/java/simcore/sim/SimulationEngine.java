@@ -15,9 +15,11 @@ import simcore.events.TelemetryBus;
 import simcore.events.TelemetryEvent;
 import simcore.rules.Rule;
 import simcore.sim.commands.PlaceFieldBrushCommand;
+import simcore.sim.commands.PlaceEmitterCommand;
 import simcore.sim.commands.SpawnAgentsCommand;
 import simcore.sim.commands.SetSelectedAgentCommand;
 import simcore.sim.commands.SetSelectedRegionCommand;
+import simcore.sim.commands.RemoveEmitterCommand;
 import simcore.snapshot.RenderSnapshot;
 import simcore.snapshot.RuleView;
 import simcore.snapshot.SelectedAgentDetails;
@@ -27,6 +29,7 @@ import simcore.util.ColorUtil;
 import simcore.util.FieldBrushApplier;
 import simcore.util.MathUtil;
 import simcore.world.WorldGrid;
+import simcore.world.objects.FoodEmitter;
 
 import java.util.Arrays;
 import java.util.List;
@@ -49,6 +52,8 @@ public class SimulationEngine {
     private final AtomicBoolean running = new AtomicBoolean(false);
     private final AtomicBoolean loopStarted = new AtomicBoolean(false);
     private final ConcurrentLinkedQueue<PlaceFieldBrushCommand> brushQueue = new ConcurrentLinkedQueue<>();
+    private final ConcurrentLinkedQueue<PlaceEmitterCommand> emitterPlaceQueue = new ConcurrentLinkedQueue<>();
+    private final ConcurrentLinkedQueue<RemoveEmitterCommand> emitterRemoveQueue = new ConcurrentLinkedQueue<>();
     private final ConcurrentLinkedQueue<SpawnAgentsCommand> spawnQueue = new ConcurrentLinkedQueue<>();
     private final ConcurrentLinkedQueue<SetSelectedAgentCommand> selectionQueue = new ConcurrentLinkedQueue<>();
     private final ConcurrentLinkedQueue<SetSelectedRegionCommand> regionQueue = new ConcurrentLinkedQueue<>();
@@ -116,6 +121,8 @@ public class SimulationEngine {
         this.agents = new AgentSystem(world, newConfig.getSeed() + 99, SimConfig.NUM_AGENTS, eventBus);
         this.tickIndex = 0;
         brushQueue.clear();
+        emitterPlaceQueue.clear();
+        emitterRemoveQueue.clear();
         spawnQueue.clear();
         selectionQueue.clear();
         regionQueue.clear();
@@ -135,6 +142,14 @@ public class SimulationEngine {
         brushQueue.add(command);
     }
 
+    public void queuePlaceEmitterCommand(PlaceEmitterCommand command) {
+        emitterPlaceQueue.add(command);
+    }
+
+    public void queueRemoveEmitterCommand(RemoveEmitterCommand command) {
+        emitterRemoveQueue.add(command);
+    }
+
     public void queueSpawnCommand(SpawnAgentsCommand command) {
         spawnQueue.add(command);
     }
@@ -149,6 +164,7 @@ public class SimulationEngine {
 
     private void step() {
         boolean dirty = applyBrushCommands();
+        dirty |= applyEmitterCommands();
         dirty |= applySpawnCommands();
         dirty |= applySelectionCommands();
         dirty |= applyRegionCommands();
@@ -250,6 +266,13 @@ public class SimulationEngine {
         System.arraycopy(world.getFoodField(), 0, back.getFood(), 0, back.getFood().length);
         System.arraycopy(world.getHazardField(), 0, back.getHazard(), 0, back.getHazard().length);
         Arrays.fill(back.getAgentCounts(), 0);
+        int[] emitterX = back.getEmitterX();
+        int[] emitterY = back.getEmitterY();
+        float[] emitterStrength = back.getEmitterStrength();
+        int[] emitterRadius = back.getEmitterRadius();
+        boolean[] emitterEnabled = back.getEmitterEnabled();
+        long[] emitterId = back.getEmitterId();
+        int emitterCapacity = emitterX.length;
         List<AgentState> agentStates = agents.getAgents();
         int index = 0;
         int capacity = back.getAgentX().length;
@@ -289,10 +312,32 @@ public class SimulationEngine {
             back.getAgentAwareness()[i] = false;
             back.getAgentCultureId()[i] = 0;
         }
+        int emitterIndex = 0;
+        for (FoodEmitter emitter : world.getEmittersView()) {
+            if (emitterIndex >= emitterCapacity) {
+                break;
+            }
+            emitterX[emitterIndex] = emitter.getX();
+            emitterY[emitterIndex] = emitter.getY();
+            emitterStrength[emitterIndex] = emitter.getStrengthPerTick();
+            emitterRadius[emitterIndex] = emitter.getRadius();
+            emitterEnabled[emitterIndex] = emitter.isEnabled();
+            emitterId[emitterIndex] = emitter.getId();
+            emitterIndex++;
+        }
+        for (int i = emitterIndex; i < emitterCapacity; i++) {
+            emitterX[i] = -1;
+            emitterY[i] = -1;
+            emitterStrength[i] = 0f;
+            emitterRadius[i] = 0;
+            emitterEnabled[i] = false;
+            emitterId[i] = -1;
+        }
         for (int i = 0; i < back.getCrowding().length; i++) {
             back.getCrowding()[i] = back.getAgentCounts()[i] / 5f;
         }
         snapshotBuffer.setAgentCount(Math.min(agentStates.size(), capacity));
+        snapshotBuffer.setEmitterCount(emitterIndex);
         snapshotBuffer.setSelectedAgentDetails(selectedDetails);
         snapshotBuffer.publish(tickIndex);
     }
@@ -378,6 +423,21 @@ public class SimulationEngine {
             return true;
         }
         return false;
+    }
+
+    private boolean applyEmitterCommands() {
+        boolean changed = false;
+        PlaceEmitterCommand placeCommand;
+        while ((placeCommand = emitterPlaceQueue.poll()) != null) {
+            world.addEmitter(placeCommand.x, placeCommand.y, placeCommand.radius, placeCommand.strength, placeCommand.enabled);
+            changed = true;
+        }
+        RemoveEmitterCommand removeCommand;
+        while ((removeCommand = emitterRemoveQueue.poll()) != null) {
+            boolean removed = world.removeEmitterAt(removeCommand.x, removeCommand.y);
+            changed |= removed;
+        }
+        return changed;
     }
 
     private SelectedAgentDetails buildSelectedAgentDetails(AgentState agent) {

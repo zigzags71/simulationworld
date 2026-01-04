@@ -21,6 +21,13 @@ public class SnapshotBuffer {
     private final int[] backAgentCulture;
     private final int[] backAgentCounts;
     private int backAgentCount;
+    private final int[] backEmitterX;
+    private final int[] backEmitterY;
+    private final float[] backEmitterStrength;
+    private final int[] backEmitterRadius;
+    private final boolean[] backEmitterEnabled;
+    private final long[] backEmitterId;
+    private int backEmitterCount;
     private SelectedAgentDetails selectedAgentDetails;
 
     public SnapshotBuffer(int width, int height, int maxAgents) {
@@ -40,9 +47,17 @@ public class SnapshotBuffer {
         backAgentCulture = new int[maxAgents];
         backAgentCounts = new int[width * height];
         backAgentCount = 0;
+        backEmitterX = new int[simcore.config.SimConfig.MAX_EMITTERS_RENDERED];
+        backEmitterY = new int[simcore.config.SimConfig.MAX_EMITTERS_RENDERED];
+        backEmitterStrength = new float[simcore.config.SimConfig.MAX_EMITTERS_RENDERED];
+        backEmitterRadius = new int[simcore.config.SimConfig.MAX_EMITTERS_RENDERED];
+        backEmitterEnabled = new boolean[simcore.config.SimConfig.MAX_EMITTERS_RENDERED];
+        backEmitterId = new long[simcore.config.SimConfig.MAX_EMITTERS_RENDERED];
+        backEmitterCount = 0;
         back = new RenderSnapshot(width, height, backFood, backHazard, backCrowding, backAgentX, backAgentY, backAgentColor, backAgentIds,
                 backAgentAge, backAgentEnergy, backAgentHunger, backAgentStress, backAgentPredictionError, backAgentAwareness,
-                backAgentCulture, backAgentCounts, backAgentCount, 0, null);
+                backAgentCulture, backAgentCounts, backAgentCount, backEmitterX, backEmitterY, backEmitterStrength, backEmitterRadius,
+                backEmitterEnabled, backEmitterId, backEmitterCount, 0, null);
         front = new AtomicReference<>(back);
     }
 
@@ -58,6 +73,10 @@ public class SnapshotBuffer {
         this.backAgentCount = count;
     }
 
+    public void setEmitterCount(int count) {
+        this.backEmitterCount = count;
+    }
+
     public void setSelectedAgentDetails(SelectedAgentDetails selectedAgentDetails) {
         this.selectedAgentDetails = selectedAgentDetails;
     }
@@ -65,7 +84,9 @@ public class SnapshotBuffer {
     public void publish(long tickIndex) {
         RenderSnapshot updated = new RenderSnapshot(back.getWidth(), back.getHeight(), backFood, backHazard, backCrowding,
                 backAgentX, backAgentY, backAgentColor, backAgentIds, backAgentAge, backAgentEnergy, backAgentHunger, backAgentStress,
-                backAgentPredictionError, backAgentAwareness, backAgentCulture, backAgentCounts, backAgentCount, tickIndex, selectedAgentDetails);
+                backAgentPredictionError, backAgentAwareness, backAgentCulture, backAgentCounts, backAgentCount,
+                backEmitterX, backEmitterY, backEmitterStrength, backEmitterRadius, backEmitterEnabled, backEmitterId, backEmitterCount,
+                tickIndex, selectedAgentDetails);
         front.set(updated);
     }
 }

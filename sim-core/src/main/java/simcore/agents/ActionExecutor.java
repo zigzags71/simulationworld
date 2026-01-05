@@ -168,7 +168,7 @@ public class ActionExecutor {
         if (best == null) {
             return move(agent, world);
         }
-        agent.setFollowLock(best.getX(), best.getY(), tickIndex + SimConfig.PATTERN_FOLLOW_LOCK_TICKS);
+        agent.setFollowLock(best.getX(), best.getY(), tickIndex + SimConfig.PATTERN_FOLLOW_LOCK_TICKS + 1);
         agent.setFollowMemory(best.getId(), -1, best.getOriginAgentId(), tickIndex);
         if (metrics != null) {
             metrics.incrementFollowMoves();

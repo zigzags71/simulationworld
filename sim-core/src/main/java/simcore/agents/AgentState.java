@@ -18,7 +18,7 @@ public class AgentState {
     private float stress;
     private float predictionError;
     private float socialCredit;
-    private final boolean awarenessFlag;
+    private int awarenessLevel;
     private final int firstNameId;
     private final int surnameId;
     private int cultureId;
@@ -51,7 +51,7 @@ public class AgentState {
         this.stress = SimConfig.INITIAL_STRESS;
         this.socialCredit = SimConfig.INITIAL_SOCIAL_CREDIT;
         this.predictionError = 0f;
-        this.awarenessFlag = false;
+        this.awarenessLevel = 0;
         this.firstNameId = firstNameId;
         this.surnameId = surnameId;
         this.cultureId = cultureId;
@@ -107,7 +107,15 @@ public class AgentState {
     }
 
     public boolean isAwarenessFlag() {
-        return awarenessFlag;
+        return awarenessLevel > 0;
+    }
+
+    public int getAwarenessLevel() {
+        return awarenessLevel;
+    }
+
+    public void setAwarenessLevel(int awarenessLevel) {
+        this.awarenessLevel = clampAwarenessLevel(awarenessLevel);
     }
 
     public int getFirstNameId() {
@@ -191,6 +199,36 @@ public class AgentState {
         this.stress = clampMetric(stress + stressDelta);
     }
 
+    void updateAwarenessLevelFromStress(float threshold1, float threshold2, float threshold3, float hysteresis) {
+        int currentLevel = awarenessLevel;
+        int targetLevel;
+        if (stress > threshold3) {
+            targetLevel = 3;
+        } else if (stress > threshold2) {
+            targetLevel = 2;
+        } else if (stress > threshold1) {
+            targetLevel = 1;
+        } else {
+            targetLevel = 0;
+        }
+
+        int newLevel = currentLevel;
+        if (targetLevel > currentLevel) {
+            newLevel = targetLevel;
+        } else {
+            if (currentLevel == 3) {
+                newLevel = (stress < (threshold3 - hysteresis)) ? 2 : 3;
+            } else if (currentLevel == 2) {
+                newLevel = (stress < (threshold2 - hysteresis)) ? 1 : 2;
+            } else if (currentLevel == 1) {
+                newLevel = (stress < (threshold1 - hysteresis)) ? 0 : 1;
+            } else {
+                newLevel = 0;
+            }
+        }
+        setAwarenessLevel(newLevel);
+    }
+
     public void updatePredictionError(float observedError) {
         float alpha = MathUtil.clamp01(SimConfig.PRED_ERROR_EMA_ALPHA);
         this.predictionError = clampMetric((1f - alpha) * predictionError + alpha * observedError);
@@ -269,5 +307,9 @@ public class AgentState {
 
     private float clampMetric(float value) {
         return MathUtil.clamp01(value);
+    }
+
+    private int clampAwarenessLevel(int value) {
+        return Math.max(0, Math.min(3, value));
     }
 }

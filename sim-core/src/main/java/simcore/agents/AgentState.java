@@ -26,6 +26,8 @@ public class AgentState {
     private long lastFollowSignalId = -1;
     private long lastFollowRuleId = -1;
     private long lastFollowTick = -1;
+    private long lastSuccessfulEatTick = -1;
+    private long lastBroadcastTick = -1;
 
     public AgentState(AgentId id, int x, int y, float energy, int firstNameId, int surnameId, int cultureId) {
         this.id = id;
@@ -132,6 +134,22 @@ public class AgentState {
         this.lastFollowSignalId = -1;
         this.lastFollowRuleId = -1;
         this.lastFollowTick = -1;
+    }
+
+    public long getLastSuccessfulEatTick() {
+        return lastSuccessfulEatTick;
+    }
+
+    public void setLastSuccessfulEatTick(long tick) {
+        this.lastSuccessfulEatTick = tick;
+    }
+
+    public long getLastBroadcastTick() {
+        return lastBroadcastTick;
+    }
+
+    public void setLastBroadcastTick(long tick) {
+        this.lastBroadcastTick = tick;
     }
 
     public long allocateRuleId() {

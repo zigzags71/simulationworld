@@ -73,6 +73,9 @@ public final class SimConfig {
     public static final float SIGNAL_VERIFIED_CONFIDENCE = 0.75f;
     public static final float SIGNAL_RELAY_CONFIDENCE = 0.55f;
     public static final int SIGNAL_STRENGTH_BINS = FIELD_BIN_COUNT;
+    public static final int SIGNAL_BROADCAST_AFTER_EAT_WINDOW = 30;
+    public static final int SIGNAL_BROADCAST_COOLDOWN_TICKS = 50;
+    public static final int SIGNAL_MAX_ACTIVE = 5_000;
 
     public static boolean LOG_EVENTS_ENABLED = false;
     public static boolean LOG_SELECTED_AGENT_ENABLED = false;

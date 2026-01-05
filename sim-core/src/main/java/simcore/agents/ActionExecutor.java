@@ -94,16 +94,26 @@ public class ActionExecutor {
                 }
             }
         }
-        if (localFood >= SimConfig.FOOD_MIN_TO_EAT || emitterNearby) {
-            int strengthBucket = BinningUtil.bin01(localFood, SimConfig.SIGNAL_STRENGTH_BINS);
-            world.getSignalField().addSignal(agent.getX(), agent.getY(), strengthBucket, SimConfig.SIGNAL_BASE_CONFIDENCE,
-                    SimConfig.SIGNAL_TTL_TICKS, 0, agent.getId().value(), tickIndex);
+        boolean ateRecently = agent.getLastSuccessfulEatTick() >= 0
+                && (tickIndex - agent.getLastSuccessfulEatTick()) <= SimConfig.SIGNAL_BROADCAST_AFTER_EAT_WINDOW;
+        boolean cooldownReady = agent.getLastBroadcastTick() < 0
+                || (tickIndex - agent.getLastBroadcastTick()) >= SimConfig.SIGNAL_BROADCAST_COOLDOWN_TICKS;
+        if ((ateRecently || emitterNearby) && cooldownReady) {
+            if (localFood >= SimConfig.FOOD_MIN_TO_EAT || emitterNearby) {
+                int strengthBucket = BinningUtil.bin01(localFood, SimConfig.SIGNAL_STRENGTH_BINS);
+                world.getSignalField().addSignal(agent.getX(), agent.getY(), strengthBucket, SimConfig.SIGNAL_BASE_CONFIDENCE,
+                        SimConfig.SIGNAL_TTL_TICKS, 0, agent.getId().value(), tickIndex);
+                agent.setLastBroadcastTick(tickIndex);
+            }
         }
         return new OutcomeVector(-SimConfig.SIGNAL_BROADCAST_COST_ENERGY, -SimConfig.SIGNAL_BROADCAST_COST_HUNGER, 0f);
     }
 
     private OutcomeVector followSignalMove(AgentState agent, WorldGrid world, long tickIndex) {
         SignalField field = world.getSignalField();
+        if (field.isEmpty()) {
+            return move(agent, world);
+        }
         int baseRadius = SimConfig.SIGNAL_SENSE_RADIUS_BASE;
         int dynamic = (int) (agent.getPredictionError() * (SimConfig.SIGNAL_SENSE_RADIUS_MAX - baseRadius));
         int radius = Math.min(SimConfig.SIGNAL_SENSE_RADIUS_MAX, baseRadius + Math.max(0, dynamic));

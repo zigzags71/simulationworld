@@ -109,6 +109,9 @@ public class AgentSystem {
             }
             OutcomeVector before = beforeStates[i];
             OutcomeVector actionDelta = actionDeltas[i] != null ? actionDeltas[i] : OutcomeVector.zero();
+            if (actionDelta.getDeltaHunger() > 0f || actionDelta.getDeltaEnergy() > 0f) {
+                agent.setLastSuccessfulEatTick(tickIndex);
+            }
             OutcomeVector totalDelta = baseDeltas[i].add(actionDelta);
             agent.applyTick(totalDelta.getDeltaEnergy(), totalDelta.getDeltaHunger(), totalDelta.getDeltaStress());
             OutcomeVector after = OutcomeVector.fromAgent(agent.getEnergy(), agent.getHunger(), agent.getStress());

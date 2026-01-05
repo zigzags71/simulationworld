@@ -199,6 +199,11 @@ public class ActionExecutor {
         if (!agent.hasFollowLock(tickIndex)) {
             return null;
         }
+        float foodHere = world.getFoodAt(agent.getX(), agent.getY());
+        if (foodHere >= SimConfig.FOOD_MIN_TO_EAT) {
+            agent.clearFollowLock();
+            return null;
+        }
         OutcomeVector delta = directedMove(agent, world, agent.getFollowLockTargetX(), agent.getFollowLockTargetY());
         if (agent.getX() == agent.getFollowLockTargetX() && agent.getY() == agent.getFollowLockTargetY()) {
             agent.clearFollowLock();

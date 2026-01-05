@@ -3,6 +3,10 @@ package simcore.agents;
 import org.junit.jupiter.api.Test;
 import simcore.config.SimConfig;
 import simcore.rules.OutcomeVector;
+import simcore.rules.ContextKey;
+import simcore.rules.Rule;
+import simcore.rules.RuleSelector;
+import simcore.rules.RuleType;
 import simcore.util.BinningUtil;
 import simcore.util.MathUtil;
 import simcore.world.WorldGrid;
@@ -15,7 +19,9 @@ import simcore.agents.AgentTickMetrics;
 import java.util.Random;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PatternLockTest {
@@ -117,5 +123,66 @@ class PatternLockTest {
         assertEquals(0f, hazard[MathUtil.index(agent.getX(), agent.getY(), width)]);
         assertEquals(-SimConfig.MOVE_ENERGY_COST, delta.getDeltaEnergy());
         assertTrue(agent.hasFoodLock(0));
+    }
+
+    @Test
+    void followSignalUnavailableWhenFoodIsGoodLocally() {
+        float[] food = new float[9];
+        float[] hazard = new float[9];
+        boolean[] water = new boolean[9];
+        int width = 3;
+        int startX = 1;
+        int startY = 1;
+        food[MathUtil.index(startX, startY, width)] = SimConfig.FOOD_MIN_TO_EAT;
+        WorldGrid world = new WorldGrid(width, 3, 5L, food, hazard, water);
+        world.getSignalField().addSignal(0, 0, 0, SimConfig.SIGNAL_BASE_CONFIDENCE, SimConfig.SIGNAL_TTL_TICKS, 0,
+                2L, 0.5f, 1L, 0L);
+
+        float foodHere = world.getFoodAt(startX, startY);
+        int foodBin = BinningUtil.bin01(foodHere, SimConfig.FIELD_BIN_COUNT);
+        int affordance = 0;
+        if (foodHere > 0f) {
+            affordance |= 1;
+        }
+        if (foodHere >= SimConfig.FOOD_MIN_TO_EAT) {
+            affordance |= 1 << 4;
+        }
+        affordance |= 1 << 1;
+
+        ContextKey key = new ContextKey(0, 0, 0, foodBin, 0, 0, 0, affordance);
+        Rule follow = new Rule(1L, RuleType.NORMAL, key, ActionType.FOLLOW_SIGNAL, OutcomeVector.zero(), 1f);
+        Rule move = new Rule(2L, RuleType.NORMAL, key, ActionType.MOVE, OutcomeVector.zero(), 1f);
+
+        AgentState agent = AgentState.forTest(new AgentId(3), startX, startY, SimConfig.INITIAL_ENERGY,
+                SimConfig.INITIAL_HUNGER, SimConfig.INITIAL_STRESS, 0f);
+        agent.addRule(follow);
+        agent.addRule(move);
+
+        var applicable = RuleSelector.applicable(agent.getRulebook(), key);
+        assertFalse(applicable.stream().anyMatch(r -> r.getAction() == ActionType.FOLLOW_SIGNAL));
+        assertTrue(applicable.stream().anyMatch(r -> r.getAction() == ActionType.MOVE));
+    }
+
+    @Test
+    void followLockClearsWhenLocalFoodIsGood() {
+        float[] food = new float[4];
+        float[] hazard = new float[4];
+        boolean[] water = new boolean[4];
+        int width = 2;
+        int startX = 0;
+        int startY = 0;
+        food[MathUtil.index(startX, startY, width)] = SimConfig.FOOD_MIN_TO_EAT;
+        WorldGrid world = new WorldGrid(width, 2, 19L, food, hazard, water);
+        AgentState agent = AgentState.forTest(new AgentId(8), startX, startY, SimConfig.INITIAL_ENERGY,
+                SimConfig.INITIAL_HUNGER, SimConfig.INITIAL_STRESS, 0f);
+        ActionExecutor executor = new ActionExecutor(new Random(9L));
+        agent.setFollowLock(1, 1, SimConfig.PATTERN_FOLLOW_LOCK_TICKS);
+
+        OutcomeVector delta = executor.executeFollowLockMove(agent, world, 1L);
+
+        assertFalse(agent.hasFollowLock(1L));
+        assertEquals(startX, agent.getX());
+        assertEquals(startY, agent.getY());
+        assertNull(delta);
     }
 }

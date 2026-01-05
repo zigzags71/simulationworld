@@ -132,6 +132,10 @@ public class WorldGrid {
         return foodStock;
     }
 
+    public float getFoodAt(int x, int y) {
+        return foodStock[index(x, y, width)];
+    }
+
     public float[] getHazardField() {
         return hazardField;
     }

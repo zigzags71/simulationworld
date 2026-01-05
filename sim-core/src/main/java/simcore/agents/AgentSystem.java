@@ -297,7 +297,7 @@ public class AgentSystem {
         int crowdBin = BinningUtil.bin01(crowdNorm, bins);
         int awareness = 0;
         int affordance = 0;
-        float foodHere = world.getFoodField()[idx];
+        float foodHere = world.getFoodAt(agent.getX(), agent.getY());
         if (foodHere > 0f) {
             affordance |= 1;
         }

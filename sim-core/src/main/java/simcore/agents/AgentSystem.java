@@ -269,7 +269,7 @@ public class AgentSystem {
         int crowdBin = BinningUtil.bin01(crowdNorm, bins);
         int awareness = 0;
         int affordance = 0;
-        if (world.getFoodField()[idx] >= SimConfig.FOOD_MIN_TO_EAT) {
+        if (world.getFoodField()[idx] > 0f) {
             affordance |= 1;
         }
         int pickupRadius = SimConfig.SIGNAL_PICKUP_RADIUS_BASE + (int) (agent.getStress() * 2);

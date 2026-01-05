@@ -42,6 +42,16 @@ public final class RuleSelector {
             }
         }
         if (!filtered.isEmpty()) {
+            List<Rule> nonBasic = new ArrayList<>();
+            for (Rule rule : filtered) {
+                if (rule.getAction() == ActionType.EAT || rule.getAction() == ActionType.FOLLOW_SIGNAL
+                        || rule.getAction() == ActionType.BROADCAST_SIGNAL) {
+                    nonBasic.add(rule);
+                }
+            }
+            if (!nonBasic.isEmpty()) {
+                return nonBasic;
+            }
             return filtered;
         }
         List<Rule> fallback = new ArrayList<>();

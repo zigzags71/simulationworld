@@ -8,6 +8,8 @@ public class TelemetryEvent {
     private final int totalDeaths;
     private final int signalsEmittedThisTick;
     private final int followMovesThisTick;
+    private final long totalSignalsEmitted;
+    private final long totalFollowMoves;
     private final float meanEnergy;
     private final float meanHunger;
     private final float meanStress;
@@ -15,6 +17,7 @@ public class TelemetryEvent {
 
     public TelemetryEvent(long tickIndex, int population, float meanPredictionError, int deathsThisTick, int totalDeaths,
                           int signalsEmittedThisTick, int followMovesThisTick,
+                          long totalSignalsEmitted, long totalFollowMoves,
                           float meanEnergy, float meanHunger, float meanStress, float meanHazard) {
         this.tickIndex = tickIndex;
         this.population = population;
@@ -23,6 +26,8 @@ public class TelemetryEvent {
         this.totalDeaths = totalDeaths;
         this.signalsEmittedThisTick = signalsEmittedThisTick;
         this.followMovesThisTick = followMovesThisTick;
+        this.totalSignalsEmitted = totalSignalsEmitted;
+        this.totalFollowMoves = totalFollowMoves;
         this.meanEnergy = meanEnergy;
         this.meanHunger = meanHunger;
         this.meanStress = meanStress;
@@ -55,6 +60,14 @@ public class TelemetryEvent {
 
     public int getFollowMovesThisTick() {
         return followMovesThisTick;
+    }
+
+    public long getTotalSignalsEmitted() {
+        return totalSignalsEmitted;
+    }
+
+    public long getTotalFollowMoves() {
+        return totalFollowMoves;
     }
 
     public float getMeanEnergy() {

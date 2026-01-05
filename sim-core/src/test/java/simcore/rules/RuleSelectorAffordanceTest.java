@@ -87,7 +87,7 @@ class RuleSelectorAffordanceTest {
             assertNotEquals(ActionType.BROADCAST_SIGNAL, chosen.getAction());
         }
 
-        int affordanceWithCooldown = (1 << 2) | (1 << 3);
+        int affordanceWithCooldown = (1 << 2) | (1 << 3) | (1 << 5);
         List<Rule> readyRules = buildRuleSet(affordanceWithCooldown);
         ContextKey readyContext = new ContextKey(0, 0, 0, 0, 0, 0, 0, affordanceWithCooldown);
         Rule chosenReady = RuleSelector.choose(RuleSelector.applicable(readyRules, readyContext), agent, new Random(13L));
@@ -97,12 +97,25 @@ class RuleSelectorAffordanceTest {
     @Test
     void moveIdleDroppedWhenBroadcastAvailable() {
         AgentState agent = AgentState.forTest(new AgentId(10), 0, 0, 0.6f, 0.6f, 0f, 0f);
-        int affordanceWithBroadcast = (1 << 2) | (1 << 3);
+        int affordanceWithBroadcast = (1 << 2) | (1 << 3) | (1 << 5);
         List<Rule> rules = buildRuleSet(affordanceWithBroadcast);
         ContextKey context = new ContextKey(0, 0, 0, 0, 0, 0, 0, affordanceWithBroadcast);
 
         List<Rule> applicable = RuleSelector.applicable(rules, context);
 
         assertTrue(applicable.stream().allMatch(rule -> rule.getAction() == ActionType.BROADCAST_SIGNAL));
+    }
+
+    @Test
+    void broadcastBlockedWhenAvailabilityMissing() {
+        AgentState agent = AgentState.forTest(new AgentId(11), 0, 0, 0.6f, 0.6f, 0f, 0f);
+        int affordanceWithoutAvailability = (1 << 2) | (1 << 3);
+        List<Rule> rules = buildRuleSet(affordanceWithoutAvailability);
+        ContextKey context = new ContextKey(0, 0, 0, 0, 0, 0, 0, affordanceWithoutAvailability);
+
+        for (int i = 0; i < 10; i++) {
+            Rule chosen = RuleSelector.choose(RuleSelector.applicable(rules, context), agent, new Random(17L + i));
+            assertNotEquals(ActionType.BROADCAST_SIGNAL, chosen.getAction());
+        }
     }
 }

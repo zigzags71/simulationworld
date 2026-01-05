@@ -73,10 +73,11 @@ public final class RuleSelector {
         boolean hasSignal = (affordance & (1 << 1)) != 0;
         boolean emitterNearby = (affordance & (1 << 2)) != 0;
         boolean broadcastReady = (affordance & (1 << 3)) != 0;
+        boolean broadcastAvailable = (affordance & (1 << 5)) != 0;
         return switch (action) {
             case EAT -> hasAnyFoodHere;
             case FOLLOW_SIGNAL -> hasSignal && !hasGoodFoodHere;
-            case BROADCAST_SIGNAL -> emitterNearby && broadcastReady;
+            case BROADCAST_SIGNAL -> broadcastAvailable && emitterNearby && broadcastReady;
             case MOVE, IDLE -> true;
         };
     }

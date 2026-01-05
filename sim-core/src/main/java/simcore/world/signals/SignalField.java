@@ -83,6 +83,11 @@ public class SignalField {
         return bestSignalWithinRadius(x, y, radius) != null;
     }
 
+    public boolean hasActiveSignalForEmitter(long emitterId) {
+        Signal signal = activeEmitterSignals.get(emitterId);
+        return signal != null && signal.getTtlTicks() > 0;
+    }
+
     public Signal bestSignalWithinRadius(int x, int y, int radius) {
         return bestSignalWithinRadius(x, y, radius, -1);
     }

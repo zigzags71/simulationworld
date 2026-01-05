@@ -282,16 +282,26 @@ public class AgentSystem {
         if (world.getSignalField().hasSignalWithinRadius(agent.getX(), agent.getY(), pickupRadius)) {
             affordance |= 1 << 1;
         }
-        for (FoodEmitter emitter : world.getEmittersView()) {
-            if (Math.abs(emitter.getX() - agent.getX()) <= 2 && Math.abs(emitter.getY() - agent.getY()) <= 2) {
-                affordance |= 1 << 2;
-                break;
+        FoodEmitter nearbyEmitter = world.findEmitterAt(agent.getX(), agent.getY());
+        if (nearbyEmitter == null) {
+            for (FoodEmitter emitter : world.getEmittersView()) {
+                if (Math.abs(emitter.getX() - agent.getX()) <= 2 && Math.abs(emitter.getY() - agent.getY()) <= 2) {
+                    nearbyEmitter = emitter;
+                    break;
+                }
             }
+        }
+        if (nearbyEmitter != null) {
+            affordance |= 1 << 2;
         }
         boolean cooldownReady = agent.getLastBroadcastTick() < 0
                 || (tickIndex - agent.getLastBroadcastTick()) >= SimConfig.SIGNAL_BROADCAST_COOLDOWN_TICKS;
         if (cooldownReady) {
             affordance |= 1 << 3;
+        }
+        if (nearbyEmitter != null && cooldownReady
+                && !world.getSignalField().hasActiveSignalForEmitter(nearbyEmitter.getId())) {
+            affordance |= 1 << 5;
         }
         return new ContextKey(hungerBin, energyBin, stressBin, foodBin, hazardBin, crowdBin, awareness, affordance);
     }

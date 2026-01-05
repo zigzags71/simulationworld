@@ -201,34 +201,29 @@ public class AgentState {
 
     void updateAwarenessLevelFromStress(float threshold1, float threshold2, float threshold3, float hysteresis) {
         int currentLevel = awarenessLevel;
+        int targetLevel;
+        if (stress > threshold3) {
+            targetLevel = 3;
+        } else if (stress > threshold2) {
+            targetLevel = 2;
+        } else if (stress > threshold1) {
+            targetLevel = 1;
+        } else {
+            targetLevel = 0;
+        }
+
         int newLevel = currentLevel;
-        if (currentLevel == 0) {
-            if (stress > threshold1) {
-                newLevel = 1;
+        if (targetLevel > currentLevel) {
+            newLevel = targetLevel;
+        } else {
+            if (currentLevel == 3) {
+                newLevel = (stress < (threshold3 - hysteresis)) ? 2 : 3;
+            } else if (currentLevel == 2) {
+                newLevel = (stress < (threshold2 - hysteresis)) ? 1 : 2;
+            } else if (currentLevel == 1) {
+                newLevel = (stress < (threshold1 - hysteresis)) ? 0 : 1;
             } else {
                 newLevel = 0;
-            }
-        } else if (currentLevel == 1) {
-            if (stress > threshold2) {
-                newLevel = 2;
-            } else if (stress < (threshold1 - hysteresis)) {
-                newLevel = 0;
-            } else {
-                newLevel = 1;
-            }
-        } else if (currentLevel == 2) {
-            if (stress > threshold3) {
-                newLevel = 3;
-            } else if (stress < (threshold2 - hysteresis)) {
-                newLevel = 1;
-            } else {
-                newLevel = 2;
-            }
-        } else if (currentLevel == 3) {
-            if (stress < (threshold3 - hysteresis)) {
-                newLevel = 2;
-            } else {
-                newLevel = 3;
             }
         }
         setAwarenessLevel(newLevel);

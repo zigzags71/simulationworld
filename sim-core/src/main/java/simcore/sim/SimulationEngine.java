@@ -198,6 +198,8 @@ public class SimulationEngine {
                     metrics.getMeanPredictionError(),
                     metrics.getDeathsThisTick(),
                     metrics.getTotalDeaths(),
+                    metrics.getSignalsEmittedThisTick(),
+                    metrics.getFollowMovesThisTick(),
                     metrics.getMeanEnergy(),
                     metrics.getMeanHunger(),
                     metrics.getMeanStress(),

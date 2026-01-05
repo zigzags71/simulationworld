@@ -52,7 +52,7 @@ class RuleSelectorAffordanceTest {
     @Test
     void followBlockedWhenFoodAvailable() {
         AgentState agent = AgentState.forTest(new AgentId(7), 0, 0, 0.4f, 0.2f, 0f, 0f);
-        int affordance = (1) | (1 << 1);
+        int affordance = (1) | (1 << 1) | (1 << 4);
         List<Rule> rules = buildRuleSet(affordance);
         ContextKey context = new ContextKey(0, 0, 0, 0, 0, 0, 0, affordance);
 
@@ -60,6 +60,19 @@ class RuleSelectorAffordanceTest {
             Rule chosen = RuleSelector.choose(RuleSelector.applicable(rules, context), agent, new Random(9L + i));
             assertNotEquals(ActionType.FOLLOW_SIGNAL, chosen.getAction());
         }
+    }
+
+    @Test
+    void followAllowedWhenOnlyTraceFoodAndSignalPresent() {
+        AgentState agent = AgentState.forTest(new AgentId(9), 0, 0, 0.4f, 0.2f, 0f, 0f);
+        int affordance = (1) | (1 << 1);
+        List<Rule> rules = buildRuleSet(affordance);
+        ContextKey context = new ContextKey(0, 0, 0, 0, 0, 0, 0, affordance);
+
+        List<Rule> applicable = RuleSelector.applicable(rules, context);
+
+        assertTrue(applicable.stream().anyMatch(rule -> rule.getAction() == ActionType.FOLLOW_SIGNAL));
+        assertTrue(applicable.stream().anyMatch(rule -> rule.getAction() == ActionType.EAT));
     }
 
     @Test
@@ -79,5 +92,17 @@ class RuleSelectorAffordanceTest {
         ContextKey readyContext = new ContextKey(0, 0, 0, 0, 0, 0, 0, affordanceWithCooldown);
         Rule chosenReady = RuleSelector.choose(RuleSelector.applicable(readyRules, readyContext), agent, new Random(13L));
         assertEquals(ActionType.BROADCAST_SIGNAL, chosenReady.getAction());
+    }
+
+    @Test
+    void moveIdleDroppedWhenBroadcastAvailable() {
+        AgentState agent = AgentState.forTest(new AgentId(10), 0, 0, 0.6f, 0.6f, 0f, 0f);
+        int affordanceWithBroadcast = (1 << 2) | (1 << 3);
+        List<Rule> rules = buildRuleSet(affordanceWithBroadcast);
+        ContextKey context = new ContextKey(0, 0, 0, 0, 0, 0, 0, affordanceWithBroadcast);
+
+        List<Rule> applicable = RuleSelector.applicable(rules, context);
+
+        assertTrue(applicable.stream().allMatch(rule -> rule.getAction() == ActionType.BROADCAST_SIGNAL));
     }
 }

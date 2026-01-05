@@ -71,6 +71,7 @@ public class AgentSystem {
         int agentCount = agents.size();
         ensureBuffers(agentCount);
         actionExecutor.beginTick(agentCount);
+        actionExecutor.setMetrics(metrics);
         for (int i = 0; i < agentCount; i++) {
             AgentState agent = agents.get(i);
             agentBuffer[i] = agent;
@@ -149,6 +150,7 @@ public class AgentSystem {
             metrics.accumulate(agent, hazardBuffer[i]);
         }
         metrics.setTotalDeaths(totalDeaths);
+        actionExecutor.setMetrics(null);
         return metrics;
     }
 
@@ -269,8 +271,12 @@ public class AgentSystem {
         int crowdBin = BinningUtil.bin01(crowdNorm, bins);
         int awareness = 0;
         int affordance = 0;
-        if (world.getFoodField()[idx] > 0f) {
+        float foodHere = world.getFoodField()[idx];
+        if (foodHere > 0f) {
             affordance |= 1;
+        }
+        if (foodHere >= SimConfig.FOOD_MIN_TO_EAT) {
+            affordance |= 1 << 4;
         }
         int pickupRadius = SimConfig.SIGNAL_PICKUP_RADIUS_BASE + (int) (agent.getStress() * 2);
         if (world.getSignalField().hasSignalWithinRadius(agent.getX(), agent.getY(), pickupRadius)) {

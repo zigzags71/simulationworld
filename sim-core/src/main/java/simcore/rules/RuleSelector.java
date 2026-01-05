@@ -68,13 +68,14 @@ public final class RuleSelector {
 
     private static boolean isActionAvailable(ActionType action, ContextKey key) {
         int affordance = key.getFoodAffordance();
-        boolean canEatHere = (affordance & 1) != 0;
+        boolean hasAnyFoodHere = (affordance & 1) != 0;
+        boolean hasGoodFoodHere = (affordance & (1 << 4)) != 0;
         boolean hasSignal = (affordance & (1 << 1)) != 0;
         boolean emitterNearby = (affordance & (1 << 2)) != 0;
         boolean broadcastReady = (affordance & (1 << 3)) != 0;
         return switch (action) {
-            case EAT -> canEatHere;
-            case FOLLOW_SIGNAL -> hasSignal && !canEatHere;
+            case EAT -> hasAnyFoodHere;
+            case FOLLOW_SIGNAL -> hasSignal && !hasGoodFoodHere;
             case BROADCAST_SIGNAL -> emitterNearby && broadcastReady;
             case MOVE, IDLE -> true;
         };

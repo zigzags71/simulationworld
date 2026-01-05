@@ -20,6 +20,7 @@ public class ActionExecutor {
     private final EatRequestBuffer eatRequests = new EatRequestBuffer();
     private final TileRequestIndex tileRequestIndex = new TileRequestIndex();
     private final RequestOrderBuffer requestOrder = new RequestOrderBuffer();
+    private AgentTickMetrics metrics;
 
     public ActionExecutor(Random random) {
         this.random = random;
@@ -27,6 +28,10 @@ public class ActionExecutor {
 
     public void beginTick(int expectedAgents) {
         eatRequests.reset(expectedAgents);
+    }
+
+    public void setMetrics(AgentTickMetrics metrics) {
+        this.metrics = metrics;
     }
 
     public OutcomeVector execute(ActionType action, AgentState agent, WorldGrid world, int agentSlot, long tickIndex) {
@@ -105,6 +110,9 @@ public class ActionExecutor {
                 world.getSignalField().addSignal(agent.getX(), agent.getY(), strengthBucket, SimConfig.SIGNAL_BASE_CONFIDENCE,
                         SimConfig.SIGNAL_TTL_TICKS, 0, agent.getId().value(), agent.getSocialCredit(), tickIndex);
                 agent.setLastBroadcastTick(tickIndex);
+                if (metrics != null) {
+                    metrics.incrementSignalsEmitted();
+                }
                 signalCreated = true;
             }
         }
@@ -142,6 +150,9 @@ public class ActionExecutor {
         }
         agent.moveTo(targetX, targetY);
         agent.setFollowMemory(best.getId(), -1, best.getOriginAgentId(), tickIndex);
+        if (metrics != null) {
+            metrics.incrementFollowMoves();
+        }
         return new OutcomeVector(-SimConfig.MOVE_ENERGY_COST, -SimConfig.MOVE_HUNGER_COST, 0f);
     }
 

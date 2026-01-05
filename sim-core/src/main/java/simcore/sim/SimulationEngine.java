@@ -196,6 +196,7 @@ public class SimulationEngine {
             writeSnapshot();
         }
         if (running.get() && metrics != null) {
+            metrics.setActiveSignalsCount(world.getSignalField().getSignals().size());
             telemetryBus.publish(buildTelemetryEvent(metrics));
         }
     }
@@ -211,6 +212,7 @@ public class SimulationEngine {
                 metrics.getTotalDeaths(),
                 metrics.getSignalsEmittedThisTick(),
                 metrics.getFollowMovesThisTick(),
+                metrics.getActiveSignalsCount(),
                 totalSignalsEmitted,
                 totalFollowMoves,
                 metrics.getMeanEnergy(),

@@ -6,6 +6,7 @@ public class AgentTickMetrics {
     private int totalDeaths;
     private int signalsEmittedThisTick;
     private int followMovesThisTick;
+    private int activeSignalsCount;
     private float totalEnergy;
     private float totalHunger;
     private float totalStress;
@@ -55,6 +56,14 @@ public class AgentTickMetrics {
 
     public int getFollowMovesThisTick() {
         return followMovesThisTick;
+    }
+
+    public void setActiveSignalsCount(int activeSignalsCount) {
+        this.activeSignalsCount = activeSignalsCount;
+    }
+
+    public int getActiveSignalsCount() {
+        return activeSignalsCount;
     }
 
     public float getMeanEnergy() {

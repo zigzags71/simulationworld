@@ -13,6 +13,9 @@ import simcore.rules.RuleType;
 import simcore.util.MathUtil;
 import simcore.world.WorldGrid;
 import simcore.world.objects.FoodEmitter;
+import simcore.agents.AgentId;
+import simcore.agents.AgentTickMetrics;
+import simcore.agents.ActionExecutor;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -39,9 +42,7 @@ class AgentBroadcastAvailabilityTest {
         int[] crowding = new int[food.length];
         crowding[MathUtil.index(1, 1, world.getWidth())] = 1;
 
-        Method buildContext = AgentSystem.class.getDeclaredMethod("buildContext", AgentState.class, WorldGrid.class, int[].class, long.class);
-        buildContext.setAccessible(true);
-        ContextKey contextWithActive = (ContextKey) buildContext.invoke(system, agent, world, crowding, 0L);
+        ContextKey contextWithActive = invokeBuildContext(system, agent, world, crowding, 0L);
         int affordanceWithActive = contextWithActive.getFoodAffordance();
         assertEquals(0, affordanceWithActive & (1 << 5));
 
@@ -53,7 +54,7 @@ class AgentBroadcastAvailabilityTest {
 
         world.getSignalField().tickDecay();
         world.getSignalField().tickDecay();
-        ContextKey contextAfterExpiry = (ContextKey) buildContext.invoke(system, agent, world, crowding, 2L);
+        ContextKey contextAfterExpiry = invokeBuildContext(system, agent, world, crowding, 2L);
         int affordanceAfterExpiry = contextAfterExpiry.getFoodAffordance();
         List<Rule> refreshedRules = new ArrayList<>();
         refreshedRules.add(new Rule(3, RuleType.NORMAL, contextAfterExpiry, ActionType.BROADCAST_SIGNAL, OutcomeVector.zero(), 1f));
@@ -61,5 +62,68 @@ class AgentBroadcastAvailabilityTest {
         Rule chosenAllowed = RuleSelector.choose(RuleSelector.applicable(refreshedRules, contextAfterExpiry), agent, new Random(7L));
         assertNotEquals(0, affordanceAfterExpiry & (1 << 5));
         assertEquals(ActionType.BROADCAST_SIGNAL, chosenAllowed.getAction());
+    }
+
+    @Test
+    void broadcastAllowedWithinDetectRadius() throws Exception {
+        int size = 20;
+        float[] food = new float[size * size];
+        float[] hazard = new float[food.length];
+        boolean[] water = new boolean[food.length];
+        WorldGrid world = new WorldGrid(size, size, 7L, food, hazard, water);
+        FoodEmitter emitter = world.addEmitter(10, 10, 1, 0.1f, true);
+        AgentState agent = AgentState.forTest(new AgentId(3), 10, 17, SimConfig.INITIAL_ENERGY,
+                SimConfig.INITIAL_HUNGER, SimConfig.INITIAL_STRESS, 0f);
+
+        AgentSystem system = new AgentSystem(world, 3L, 0, new EventBus<SimulationEvent>());
+        int[] crowding = new int[food.length];
+        crowding[MathUtil.index(agent.getX(), agent.getY(), world.getWidth())] = 1;
+
+        ContextKey key = invokeBuildContext(system, agent, world, crowding, 0L);
+        int affordance = key.getFoodAffordance();
+        AgentTickMetrics metrics = new AgentTickMetrics();
+        ActionExecutor executor = new ActionExecutor(new Random(5L));
+        executor.setMetrics(metrics);
+
+        OutcomeVector delta = executor.execute(ActionType.BROADCAST_SIGNAL, agent, world, 0, 0L);
+
+        assertNotEquals(0, affordance & (1 << 2));
+        assertNotEquals(0, affordance & (1 << 5));
+        assertNotEquals(OutcomeVector.zero(), delta);
+        assertEquals(1, world.getSignalField().getSignals().size());
+        assertEquals(1, metrics.getSignalsEmittedThisTick());
+        assertEquals(emitter.getId(), world.getSignalField().getSignals().get(0).getEmitterId());
+    }
+
+    @Test
+    void broadcastDisallowedOutsideDetectRadius() throws Exception {
+        int size = 20;
+        float[] food = new float[size * size];
+        float[] hazard = new float[food.length];
+        boolean[] water = new boolean[food.length];
+        WorldGrid world = new WorldGrid(size, size, 8L, food, hazard, water);
+        world.addEmitter(10, 10, 1, 0.1f, true);
+        AgentState agent = AgentState.forTest(new AgentId(4), 0, 0, SimConfig.INITIAL_ENERGY,
+                SimConfig.INITIAL_HUNGER, SimConfig.INITIAL_STRESS, 0f);
+        AgentSystem system = new AgentSystem(world, 4L, 0, new EventBus<SimulationEvent>());
+        int[] crowding = new int[food.length];
+        crowding[MathUtil.index(agent.getX(), agent.getY(), world.getWidth())] = 1;
+
+        ContextKey key = invokeBuildContext(system, agent, world, crowding, 0L);
+        int affordance = key.getFoodAffordance();
+
+        ActionExecutor executor = new ActionExecutor(new Random(6L));
+        OutcomeVector delta = executor.execute(ActionType.BROADCAST_SIGNAL, agent, world, 0, 0L);
+
+        assertEquals(0, affordance & (1 << 2));
+        assertEquals(0, affordance & (1 << 5));
+        assertEquals(0, world.getSignalField().getSignals().size());
+        assertEquals(OutcomeVector.zero(), delta);
+    }
+
+    private ContextKey invokeBuildContext(AgentSystem system, AgentState agent, WorldGrid world, int[] crowding, long tick) throws Exception {
+        Method buildContext = AgentSystem.class.getDeclaredMethod("buildContext", AgentState.class, WorldGrid.class, int[].class, long.class);
+        buildContext.setAccessible(true);
+        return (ContextKey) buildContext.invoke(system, agent, world, crowding, tick);
     }
 }

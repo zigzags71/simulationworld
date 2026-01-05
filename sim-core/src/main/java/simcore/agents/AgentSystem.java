@@ -149,6 +149,7 @@ public class AgentSystem {
             }
             metrics.accumulate(agent, hazardBuffer[i]);
         }
+        metrics.setActiveSignalsCount(world.getSignalField().getSignals().size());
         metrics.setTotalDeaths(totalDeaths);
         actionExecutor.setMetrics(null);
         return metrics;
@@ -282,15 +283,8 @@ public class AgentSystem {
         if (world.getSignalField().hasSignalWithinRadius(agent.getX(), agent.getY(), pickupRadius)) {
             affordance |= 1 << 1;
         }
-        FoodEmitter nearbyEmitter = world.findEmitterAt(agent.getX(), agent.getY());
-        if (nearbyEmitter == null) {
-            for (FoodEmitter emitter : world.getEmittersView()) {
-                if (Math.abs(emitter.getX() - agent.getX()) <= 2 && Math.abs(emitter.getY() - agent.getY()) <= 2) {
-                    nearbyEmitter = emitter;
-                    break;
-                }
-            }
-        }
+        FoodEmitter nearbyEmitter = world.findNearestEmitterWithin(agent.getX(), agent.getY(),
+                SimConfig.SIGNAL_EMITTER_DETECT_RADIUS);
         if (nearbyEmitter != null) {
             affordance |= 1 << 2;
         }

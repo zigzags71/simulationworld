@@ -19,12 +19,13 @@ public class MonitorBar extends HBox {
     private final Label tpsLabel = new Label("TPS: --");
     private final Label signalsLabel = new Label("Sig: 0 (Tot 0)");
     private final Label followLabel = new Label("Follow: 0 (Tot 0)");
+    private final Label activeSignalsLabel = new Label("ActiveSig: 0");
 
     public MonitorBar(TelemetryBus telemetryBus) {
         setSpacing(16);
         setPadding(new Insets(8));
         getChildren().addAll(tickLabel, populationLabel, predictionLabel, deathsLabel,
-                energyLabel, hungerLabel, stressLabel, fpsLabel, tpsLabel, signalsLabel, followLabel);
+                energyLabel, hungerLabel, stressLabel, fpsLabel, tpsLabel, signalsLabel, followLabel, activeSignalsLabel);
         telemetryBus.subscribe(event -> Platform.runLater(() -> onTelemetry(event)));
     }
 
@@ -38,6 +39,7 @@ public class MonitorBar extends HBox {
         stressLabel.setText(String.format("Stress: %.3f", event.getMeanStress()));
         signalsLabel.setText(String.format("Sig: %d (Tot %d)", event.getSignalsEmittedThisTick(), event.getTotalSignalsEmitted()));
         followLabel.setText(String.format("Follow: %d (Tot %d)", event.getFollowMovesThisTick(), event.getTotalFollowMoves()));
+        activeSignalsLabel.setText(String.format("ActiveSig: %d", event.getActiveSignalsCount()));
     }
 
     public void updatePerformance(double fps, long tps) {

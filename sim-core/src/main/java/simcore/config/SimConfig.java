@@ -66,6 +66,7 @@ public final class SimConfig {
     public static final int SIGNAL_PICKUP_RADIUS_BASE = 6;
     public static final int SIGNAL_SENSE_RADIUS_BASE = 12;
     public static final int SIGNAL_SENSE_RADIUS_MAX = 200;
+    public static final int SIGNAL_EMITTER_DETECT_RADIUS = 8;
     public static final float SIGNAL_RELAY_TRUST_THRESHOLD = 0.65f;
     public static final int SIGNAL_VERIFY_WINDOW_TICKS = 80;
     public static final float SIGNAL_BROADCAST_COST_ENERGY = 0.01f;

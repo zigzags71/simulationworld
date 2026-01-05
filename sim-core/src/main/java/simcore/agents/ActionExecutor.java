@@ -90,15 +90,8 @@ public class ActionExecutor {
     private OutcomeVector broadcast(AgentState agent, WorldGrid world, long tickIndex) {
         int idx = MathUtil.index(agent.getX(), agent.getY(), world.getWidth());
         float localFood = world.getFoodField()[idx];
-        FoodEmitter nearbyEmitter = world.findEmitterAt(agent.getX(), agent.getY());
-        if (nearbyEmitter == null) {
-            for (FoodEmitter emitter : world.getEmittersView()) {
-                if (Math.abs(emitter.getX() - agent.getX()) <= 2 && Math.abs(emitter.getY() - agent.getY()) <= 2) {
-                    nearbyEmitter = emitter;
-                    break;
-                }
-            }
-        }
+        FoodEmitter nearbyEmitter = world.findNearestEmitterWithin(agent.getX(), agent.getY(),
+                SimConfig.SIGNAL_EMITTER_DETECT_RADIUS);
         boolean ateRecently = agent.getLastSuccessfulEatTick() >= 0
                 && (tickIndex - agent.getLastSuccessfulEatTick()) <= SimConfig.SIGNAL_BROADCAST_AFTER_EAT_WINDOW;
         boolean cooldownReady = agent.getLastBroadcastTick() < 0

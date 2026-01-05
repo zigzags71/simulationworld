@@ -81,6 +81,38 @@ public class ActionExecutor {
         return new OutcomeVector(-SimConfig.MOVE_ENERGY_COST, -SimConfig.MOVE_HUNGER_COST, 0f);
     }
 
+    private OutcomeVector directedMove(AgentState agent, WorldGrid world, int targetX, int targetY) {
+        int dx = Integer.compare(targetX, agent.getX());
+        int dy = Integer.compare(targetY, agent.getY());
+        int nextX = MathUtil.clamp(agent.getX() + dx, 0, world.getWidth() - 1);
+        int nextY = MathUtil.clamp(agent.getY() + dy, 0, world.getHeight() - 1);
+        int idx = MathUtil.index(nextX, nextY, world.getWidth());
+        boolean backtrack = nextX == agent.getLastX() && nextY == agent.getLastY();
+        if (world.getWaterMask()[idx] || backtrack) {
+            int altX1 = MathUtil.clamp(agent.getX() + dx, 0, world.getWidth() - 1);
+            int altY1 = agent.getY();
+            int altX2 = agent.getX();
+            int altY2 = MathUtil.clamp(agent.getY() + dy, 0, world.getHeight() - 1);
+            boolean alt1Valid = dx != 0 && !world.getWaterMask()[MathUtil.index(altX1, altY1, world.getWidth())]
+                    && !(altX1 == agent.getLastX() && altY1 == agent.getLastY());
+            boolean alt2Valid = dy != 0 && !world.getWaterMask()[MathUtil.index(altX2, altY2, world.getWidth())]
+                    && !(altX2 == agent.getLastX() && altY2 == agent.getLastY());
+            if (alt1Valid) {
+                nextX = altX1;
+                nextY = altY1;
+            } else if (alt2Valid) {
+                nextX = altX2;
+                nextY = altY2;
+            } else if (world.getWaterMask()[idx]) {
+                nextX = agent.getX();
+                nextY = agent.getY();
+            }
+        }
+        agent.snapshotLastPos();
+        agent.moveTo(nextX, nextY);
+        return new OutcomeVector(-SimConfig.MOVE_ENERGY_COST, -SimConfig.MOVE_HUNGER_COST, 0f);
+    }
+
     private OutcomeVector eat(AgentState agent, WorldGrid world, int agentSlot, long tickIndex) {
         int idx = MathUtil.index(agent.getX(), agent.getY(), world.getWidth());
         eatRequests.add(idx, agent.getId().value(), agentSlot, SimConfig.FOOD_CONSUME_RATE, tickIndex);
@@ -118,6 +150,13 @@ public class ActionExecutor {
     }
 
     private OutcomeVector followSignalMove(AgentState agent, WorldGrid world, long tickIndex) {
+        if (agent.hasFollowLock(tickIndex)) {
+            OutcomeVector delta = directedMove(agent, world, agent.getFollowLockTargetX(), agent.getFollowLockTargetY());
+            if (agent.getX() == agent.getFollowLockTargetX() && agent.getY() == agent.getFollowLockTargetY()) {
+                agent.clearFollowLock();
+            }
+            return delta;
+        }
         SignalField field = world.getSignalField();
         if (field.isEmpty()) {
             return move(agent, world);
@@ -129,26 +168,31 @@ public class ActionExecutor {
         if (best == null) {
             return move(agent, world);
         }
-        int dx = Integer.compare(best.getX(), agent.getX());
-        int dy = Integer.compare(best.getY(), agent.getY());
-        int targetX = MathUtil.clamp(agent.getX() + dx, 0, world.getWidth() - 1);
-        int targetY = MathUtil.clamp(agent.getY() + dy, 0, world.getHeight() - 1);
-        int idx = MathUtil.index(targetX, targetY, world.getWidth());
-        if (world.getWaterMask()[idx]) {
-            if (!world.getWaterMask()[MathUtil.index(MathUtil.clamp(agent.getX() + dx, 0, world.getWidth() - 1), agent.getY(), world.getWidth())]) {
-                targetX = MathUtil.clamp(agent.getX() + dx, 0, world.getWidth() - 1);
-                targetY = agent.getY();
-            } else if (!world.getWaterMask()[MathUtil.index(agent.getX(), MathUtil.clamp(agent.getY() + dy, 0, world.getHeight() - 1), world.getWidth())]) {
-                targetX = agent.getX();
-                targetY = MathUtil.clamp(agent.getY() + dy, 0, world.getHeight() - 1);
-            }
-        }
-        agent.moveTo(targetX, targetY);
+        agent.setFollowLock(best.getX(), best.getY(), tickIndex + SimConfig.PATTERN_FOLLOW_LOCK_TICKS);
         agent.setFollowMemory(best.getId(), -1, best.getOriginAgentId(), tickIndex);
         if (metrics != null) {
             metrics.incrementFollowMoves();
         }
-        return new OutcomeVector(-SimConfig.MOVE_ENERGY_COST, -SimConfig.MOVE_HUNGER_COST, 0f);
+        OutcomeVector delta = directedMove(agent, world, best.getX(), best.getY());
+        if (agent.getX() == best.getX() && agent.getY() == best.getY()) {
+            agent.clearFollowLock();
+        }
+        return delta;
+    }
+
+    public OutcomeVector executeFoodLockMoveIfActive(AgentState agent, WorldGrid world, long tickIndex) {
+        if (!agent.hasFoodLock(tickIndex)) {
+            return null;
+        }
+        int targetX = agent.getFoodLockTargetX();
+        int targetY = agent.getFoodLockTargetY();
+        int targetIdx = MathUtil.index(targetX, targetY, world.getWidth());
+        if (world.getFoodField()[targetIdx] < SimConfig.FOOD_MIN_TO_EAT
+                || (agent.getX() == targetX && agent.getY() == targetY)) {
+            agent.clearFoodLock();
+            return null;
+        }
+        return directedMove(agent, world, targetX, targetY);
     }
 
     public void resolveEatRequests(WorldGrid world, OutcomeVector[] actionDeltas, EventBus<SimulationEvent> eventBus) {

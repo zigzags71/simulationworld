@@ -96,6 +96,22 @@ public class AgentSystem {
                     -SimConfig.ENERGY_DRAIN_PER_TICK - hazardHere * SimConfig.HAZARD_ENERGY_DRAIN_PER_TICK,
                     -SimConfig.HUNGER_DRAIN_PER_TICK,
                     hazardHere * SimConfig.HAZARD_STRESS_GAIN_PER_TICK - SimConfig.STRESS_RECOVERY_PER_TICK);
+            if (rule.getAction() == ActionType.MOVE) {
+                OutcomeVector lockedMove = actionExecutor.executeFoodLockMoveIfActive(agent, world, tickIndex);
+                if (lockedMove != null) {
+                    actionDeltas[i] = lockedMove;
+                    continue;
+                }
+                int bestIdx = world.findBestFoodTileIndexWithin(agent.getX(), agent.getY(),
+                        SimConfig.PATTERN_FOOD_TARGET_RADIUS);
+                if (bestIdx != -1) {
+                    int targetY = bestIdx / width;
+                    int targetX = bestIdx - targetY * width;
+                    if (targetX != agent.getX() || targetY != agent.getY()) {
+                        agent.setFoodLock(targetX, targetY, tickIndex + SimConfig.PATTERN_FOOD_LOCK_TICKS);
+                    }
+                }
+            }
             actionDeltas[i] = actionExecutor.execute(rule.getAction(), agent, world, i, tickIndex);
         }
         actionExecutor.resolveEatRequests(world, actionDeltas, eventBus);

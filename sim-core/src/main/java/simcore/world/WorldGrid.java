@@ -177,6 +177,33 @@ public class WorldGrid {
         return emitter;
     }
 
+    public int findBestFoodTileIndexWithin(int x, int y, int radius) {
+        int minX = Math.max(0, x - radius);
+        int maxX = Math.min(width - 1, x + radius);
+        int minY = Math.max(0, y - radius);
+        int maxY = Math.min(height - 1, y + radius);
+        float bestScore = Float.NEGATIVE_INFINITY;
+        int bestIdx = -1;
+        for (int ty = minY; ty <= maxY; ty++) {
+            for (int tx = minX; tx <= maxX; tx++) {
+                int idx = index(tx, ty, width);
+                if (waterMask[idx]) {
+                    continue;
+                }
+                float foodValue = foodStock[idx];
+                if (foodValue < SimConfig.PATTERN_FOOD_MIN_TARGET) {
+                    continue;
+                }
+                float score = foodValue - hazardField[idx] * SimConfig.MOVE_HAZARD_WEIGHT;
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestIdx = idx;
+                }
+            }
+        }
+        return bestIdx;
+    }
+
     public FoodEmitter findNearestEmitterWithin(int x, int y, int radius) {
         FoodEmitter best = null;
         int bestDist = Integer.MAX_VALUE;

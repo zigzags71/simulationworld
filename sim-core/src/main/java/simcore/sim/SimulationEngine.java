@@ -69,6 +69,8 @@ public class SimulationEngine {
     private SelectedRegionSnapshotEvent lastRegionSnapshot;
     private long lastRegionEventTick = -SimConfig.LOG_THROTTLE_TICKS;
     private long tickIndex = 0;
+    private long totalSignalsEmitted = 0;
+    private long totalFollowMoves = 0;
 
     public SimulationEngine(long seed, TelemetryBus telemetryBus) {
         this(MapGenConfig.defaults().withSeed(seed), telemetryBus);
@@ -122,6 +124,8 @@ public class SimulationEngine {
         this.world = WorldGrid.generate(newConfig);
         this.agents = new AgentSystem(world, newConfig.getSeed() + 99, SimConfig.NUM_AGENTS, eventBus);
         this.tickIndex = 0;
+        this.totalSignalsEmitted = 0;
+        this.totalFollowMoves = 0;
         brushQueue.clear();
         emitterPlaceQueue.clear();
         emitterRemoveQueue.clear();
@@ -192,17 +196,29 @@ public class SimulationEngine {
             writeSnapshot();
         }
         if (running.get() && metrics != null) {
-            telemetryBus.publish(new TelemetryEvent(
-                    tickIndex,
-                    metrics.getPopulation(),
-                    metrics.getMeanPredictionError(),
-                    metrics.getDeathsThisTick(),
-                    metrics.getTotalDeaths(),
-                    metrics.getMeanEnergy(),
-                    metrics.getMeanHunger(),
-                    metrics.getMeanStress(),
-                    metrics.getMeanHazard()));
+            metrics.setActiveSignalsCount(world.getSignalField().getSignals().size());
+            telemetryBus.publish(buildTelemetryEvent(metrics));
         }
+    }
+
+    TelemetryEvent buildTelemetryEvent(AgentTickMetrics metrics) {
+        totalSignalsEmitted += metrics.getSignalsEmittedThisTick();
+        totalFollowMoves += metrics.getFollowMovesThisTick();
+        return new TelemetryEvent(
+                tickIndex,
+                metrics.getPopulation(),
+                metrics.getMeanPredictionError(),
+                metrics.getDeathsThisTick(),
+                metrics.getTotalDeaths(),
+                metrics.getSignalsEmittedThisTick(),
+                metrics.getFollowMovesThisTick(),
+                metrics.getActiveSignalsCount(),
+                totalSignalsEmitted,
+                totalFollowMoves,
+                metrics.getMeanEnergy(),
+                metrics.getMeanHunger(),
+                metrics.getMeanStress(),
+                metrics.getMeanHazard());
     }
 
     private void emitSelectedAgentSnapshot(long currentTick) {
@@ -212,7 +228,7 @@ public class SimulationEngine {
         AgentState agent = agents.findAgentById(selectedAgentId);
         if (agent != null) {
             eventBus.publish(new SelectedAgentSnapshotEvent(agent.getId().value(), agent.getEnergy(), agent.getHunger(),
-                    agent.getStress(), agent.getPredictionError(), currentTick));
+                    agent.getStress(), agent.getPredictionError(), agent.getSocialCredit(), currentTick));
         }
     }
 

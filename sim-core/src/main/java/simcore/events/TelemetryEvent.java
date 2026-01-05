@@ -6,18 +6,31 @@ public class TelemetryEvent {
     private final float meanPredictionError;
     private final int deathsThisTick;
     private final int totalDeaths;
+    private final int signalsEmittedThisTick;
+    private final int followMovesThisTick;
+    private final int activeSignalsCount;
+    private final long totalSignalsEmitted;
+    private final long totalFollowMoves;
     private final float meanEnergy;
     private final float meanHunger;
     private final float meanStress;
     private final float meanHazard;
 
     public TelemetryEvent(long tickIndex, int population, float meanPredictionError, int deathsThisTick, int totalDeaths,
+                          int signalsEmittedThisTick, int followMovesThisTick,
+                          int activeSignalsCount,
+                          long totalSignalsEmitted, long totalFollowMoves,
                           float meanEnergy, float meanHunger, float meanStress, float meanHazard) {
         this.tickIndex = tickIndex;
         this.population = population;
         this.meanPredictionError = meanPredictionError;
         this.deathsThisTick = deathsThisTick;
         this.totalDeaths = totalDeaths;
+        this.signalsEmittedThisTick = signalsEmittedThisTick;
+        this.followMovesThisTick = followMovesThisTick;
+        this.activeSignalsCount = activeSignalsCount;
+        this.totalSignalsEmitted = totalSignalsEmitted;
+        this.totalFollowMoves = totalFollowMoves;
         this.meanEnergy = meanEnergy;
         this.meanHunger = meanHunger;
         this.meanStress = meanStress;
@@ -42,6 +55,26 @@ public class TelemetryEvent {
 
     public int getTotalDeaths() {
         return totalDeaths;
+    }
+
+    public int getSignalsEmittedThisTick() {
+        return signalsEmittedThisTick;
+    }
+
+    public int getFollowMovesThisTick() {
+        return followMovesThisTick;
+    }
+
+    public int getActiveSignalsCount() {
+        return activeSignalsCount;
+    }
+
+    public long getTotalSignalsEmitted() {
+        return totalSignalsEmitted;
+    }
+
+    public long getTotalFollowMoves() {
+        return totalFollowMoves;
     }
 
     public float getMeanEnergy() {

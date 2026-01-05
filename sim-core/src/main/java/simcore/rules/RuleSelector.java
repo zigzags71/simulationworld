@@ -26,12 +26,60 @@ public final class RuleSelector {
             }
         }
         if (!out.isEmpty()) {
-            return out;
+            return filterByAffordance(out, key, normals);
         }
         if (!normals.isEmpty()) {
-            return normals;
+            return filterByAffordance(normals, key, normals);
         }
         return rules;
+    }
+
+    private static List<Rule> filterByAffordance(List<Rule> candidates, ContextKey key, List<Rule> normals) {
+        List<Rule> filtered = new ArrayList<>();
+        for (Rule rule : candidates) {
+            if (isActionAvailable(rule.getAction(), key)) {
+                filtered.add(rule);
+            }
+        }
+        if (!filtered.isEmpty()) {
+            List<Rule> nonBasic = new ArrayList<>();
+            for (Rule rule : filtered) {
+                if (rule.getAction() == ActionType.EAT || rule.getAction() == ActionType.FOLLOW_SIGNAL
+                        || rule.getAction() == ActionType.BROADCAST_SIGNAL) {
+                    nonBasic.add(rule);
+                }
+            }
+            if (!nonBasic.isEmpty()) {
+                return nonBasic;
+            }
+            return filtered;
+        }
+        List<Rule> fallback = new ArrayList<>();
+        for (Rule rule : normals) {
+            if (rule.getAction() == ActionType.MOVE || rule.getAction() == ActionType.IDLE) {
+                fallback.add(rule);
+            }
+        }
+        if (!fallback.isEmpty()) {
+            return fallback;
+        }
+        return filtered;
+    }
+
+    private static boolean isActionAvailable(ActionType action, ContextKey key) {
+        int affordance = key.getFoodAffordance();
+        boolean hasAnyFoodHere = (affordance & 1) != 0;
+        boolean hasGoodFoodHere = (affordance & (1 << 4)) != 0;
+        boolean hasSignal = (affordance & (1 << 1)) != 0;
+        boolean emitterNearby = (affordance & (1 << 2)) != 0;
+        boolean broadcastReady = (affordance & (1 << 3)) != 0;
+        boolean broadcastAvailable = (affordance & (1 << 5)) != 0;
+        return switch (action) {
+            case EAT -> hasAnyFoodHere;
+            case FOLLOW_SIGNAL -> hasSignal && !hasGoodFoodHere;
+            case BROADCAST_SIGNAL -> broadcastAvailable && emitterNearby && broadcastReady;
+            case MOVE, IDLE -> true;
+        };
     }
 
     public static Rule choose(List<Rule> candidates, AgentState agent, Random random) {

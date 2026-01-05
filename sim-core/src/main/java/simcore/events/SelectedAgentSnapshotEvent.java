@@ -6,14 +6,17 @@ public class SelectedAgentSnapshotEvent implements SimulationEvent {
     private final float hunger;
     private final float stress;
     private final float predictionError;
+    private final float socialCredit;
     private final long tick;
 
-    public SelectedAgentSnapshotEvent(long agentId, float energy, float hunger, float stress, float predictionError, long tick) {
+    public SelectedAgentSnapshotEvent(long agentId, float energy, float hunger, float stress, float predictionError,
+                                      float socialCredit, long tick) {
         this.agentId = agentId;
         this.energy = energy;
         this.hunger = hunger;
         this.stress = stress;
         this.predictionError = predictionError;
+        this.socialCredit = socialCredit;
         this.tick = tick;
     }
 
@@ -35,6 +38,10 @@ public class SelectedAgentSnapshotEvent implements SimulationEvent {
 
     public float getPredictionError() {
         return predictionError;
+    }
+
+    public float getSocialCredit() {
+        return socialCredit;
     }
 
     public long getTick() {

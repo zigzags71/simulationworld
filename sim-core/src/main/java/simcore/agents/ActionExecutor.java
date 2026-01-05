@@ -20,6 +20,7 @@ public class ActionExecutor {
     private final EatRequestBuffer eatRequests = new EatRequestBuffer();
     private final TileRequestIndex tileRequestIndex = new TileRequestIndex();
     private final RequestOrderBuffer requestOrder = new RequestOrderBuffer();
+    private AgentTickMetrics metrics;
 
     public ActionExecutor(Random random) {
         this.random = random;
@@ -27,6 +28,10 @@ public class ActionExecutor {
 
     public void beginTick(int expectedAgents) {
         eatRequests.reset(expectedAgents);
+    }
+
+    public void setMetrics(AgentTickMetrics metrics) {
+        this.metrics = metrics;
     }
 
     public OutcomeVector execute(ActionType action, AgentState agent, WorldGrid world, int agentSlot, long tickIndex) {
@@ -85,28 +90,31 @@ public class ActionExecutor {
     private OutcomeVector broadcast(AgentState agent, WorldGrid world, long tickIndex) {
         int idx = MathUtil.index(agent.getX(), agent.getY(), world.getWidth());
         float localFood = world.getFoodField()[idx];
-        boolean emitterNearby = world.findEmitterAt(agent.getX(), agent.getY()) != null;
-        if (!emitterNearby) {
-            for (FoodEmitter emitter : world.getEmittersView()) {
-                if (Math.abs(emitter.getX() - agent.getX()) <= 2 && Math.abs(emitter.getY() - agent.getY()) <= 2) {
-                    emitterNearby = true;
-                    break;
-                }
-            }
-        }
+        FoodEmitter nearbyEmitter = world.findNearestEmitterWithin(agent.getX(), agent.getY(),
+                SimConfig.SIGNAL_EMITTER_DETECT_RADIUS);
         boolean ateRecently = agent.getLastSuccessfulEatTick() >= 0
                 && (tickIndex - agent.getLastSuccessfulEatTick()) <= SimConfig.SIGNAL_BROADCAST_AFTER_EAT_WINDOW;
         boolean cooldownReady = agent.getLastBroadcastTick() < 0
                 || (tickIndex - agent.getLastBroadcastTick()) >= SimConfig.SIGNAL_BROADCAST_COOLDOWN_TICKS;
-        if ((ateRecently || emitterNearby) && cooldownReady) {
-            if (localFood >= SimConfig.FOOD_MIN_TO_EAT || emitterNearby) {
+        boolean signalCreated = false;
+        if ((ateRecently || nearbyEmitter != null) && cooldownReady && nearbyEmitter != null) {
+            if (localFood >= SimConfig.FOOD_MIN_TO_EAT || nearbyEmitter != null) {
                 int strengthBucket = BinningUtil.bin01(localFood, SimConfig.SIGNAL_STRENGTH_BINS);
-                world.getSignalField().addSignal(agent.getX(), agent.getY(), strengthBucket, SimConfig.SIGNAL_BASE_CONFIDENCE,
-                        SimConfig.SIGNAL_TTL_TICKS, 0, agent.getId().value(), tickIndex);
-                agent.setLastBroadcastTick(tickIndex);
+                Signal signal = world.getSignalField().addSignal(agent.getX(), agent.getY(), strengthBucket, SimConfig.SIGNAL_BASE_CONFIDENCE,
+                        SimConfig.SIGNAL_TTL_TICKS, 0, agent.getId().value(), agent.getSocialCredit(), nearbyEmitter.getId(), tickIndex);
+                if (signal != null) {
+                    agent.setLastBroadcastTick(tickIndex);
+                    if (metrics != null) {
+                        metrics.incrementSignalsEmitted();
+                    }
+                    signalCreated = true;
+                }
             }
         }
-        return new OutcomeVector(-SimConfig.SIGNAL_BROADCAST_COST_ENERGY, -SimConfig.SIGNAL_BROADCAST_COST_HUNGER, 0f);
+        if (signalCreated) {
+            return new OutcomeVector(-SimConfig.SIGNAL_BROADCAST_COST_ENERGY, -SimConfig.SIGNAL_BROADCAST_COST_HUNGER, 0f);
+        }
+        return OutcomeVector.zero();
     }
 
     private OutcomeVector followSignalMove(AgentState agent, WorldGrid world, long tickIndex) {
@@ -117,7 +125,7 @@ public class ActionExecutor {
         int baseRadius = SimConfig.SIGNAL_SENSE_RADIUS_BASE;
         int dynamic = (int) (agent.getPredictionError() * (SimConfig.SIGNAL_SENSE_RADIUS_MAX - baseRadius));
         int radius = Math.min(SimConfig.SIGNAL_SENSE_RADIUS_MAX, baseRadius + Math.max(0, dynamic));
-        Signal best = field.bestSignalWithinRadius(agent.getX(), agent.getY(), radius);
+        Signal best = field.bestSignalWithinRadius(agent.getX(), agent.getY(), radius, agent.getId().value());
         if (best == null) {
             return move(agent, world);
         }
@@ -136,7 +144,10 @@ public class ActionExecutor {
             }
         }
         agent.moveTo(targetX, targetY);
-        agent.setFollowMemory(best.getId(), -1, tickIndex);
+        agent.setFollowMemory(best.getId(), -1, best.getOriginAgentId(), tickIndex);
+        if (metrics != null) {
+            metrics.incrementFollowMoves();
+        }
         return new OutcomeVector(-SimConfig.MOVE_ENERGY_COST, -SimConfig.MOVE_HUNGER_COST, 0f);
     }
 

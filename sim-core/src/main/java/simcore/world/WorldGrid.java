@@ -177,6 +177,19 @@ public class WorldGrid {
         return emitter;
     }
 
+    public FoodEmitter findNearestEmitterWithin(int x, int y, int radius) {
+        FoodEmitter best = null;
+        int bestDist = Integer.MAX_VALUE;
+        for (FoodEmitter emitter : emitters) {
+            int dist = Math.max(Math.abs(emitter.getX() - x), Math.abs(emitter.getY() - y));
+            if (dist <= radius && dist < bestDist) {
+                bestDist = dist;
+                best = emitter;
+            }
+        }
+        return best;
+    }
+
     public boolean removeEmitterAt(int x, int y) {
         FoodEmitter emitter = findEmitterAt(x, y);
         if (emitter == null) {

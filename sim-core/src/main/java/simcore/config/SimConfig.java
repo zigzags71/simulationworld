@@ -22,6 +22,7 @@ public final class SimConfig {
     public static final float INITIAL_ENERGY = 1.0f;
     public static final float INITIAL_HUNGER = 1.0f;
     public static final float INITIAL_STRESS = 0.0f;
+    public static final float INITIAL_SOCIAL_CREDIT = 0.0f;
 
     public static final float HUNGER_DRAIN_PER_TICK = 0.0008f;
     public static final float ENERGY_DRAIN_PER_TICK = 0.00045f;
@@ -65,6 +66,7 @@ public final class SimConfig {
     public static final int SIGNAL_PICKUP_RADIUS_BASE = 6;
     public static final int SIGNAL_SENSE_RADIUS_BASE = 12;
     public static final int SIGNAL_SENSE_RADIUS_MAX = 200;
+    public static final int SIGNAL_EMITTER_DETECT_RADIUS = 8;
     public static final float SIGNAL_RELAY_TRUST_THRESHOLD = 0.65f;
     public static final int SIGNAL_VERIFY_WINDOW_TICKS = 80;
     public static final float SIGNAL_BROADCAST_COST_ENERGY = 0.01f;
@@ -72,10 +74,14 @@ public final class SimConfig {
     public static final float SIGNAL_BASE_CONFIDENCE = 0.25f;
     public static final float SIGNAL_VERIFIED_CONFIDENCE = 0.75f;
     public static final float SIGNAL_RELAY_CONFIDENCE = 0.55f;
+    public static final float SIGNAL_SOCIAL_CREDIT_WEIGHT = 0.5f;
     public static final int SIGNAL_STRENGTH_BINS = FIELD_BIN_COUNT;
     public static final int SIGNAL_BROADCAST_AFTER_EAT_WINDOW = 30;
     public static final int SIGNAL_BROADCAST_COOLDOWN_TICKS = 50;
     public static final int SIGNAL_MAX_ACTIVE = 5_000;
+
+    public static final int SOCIAL_CREDIT_REWARD_WINDOW_TICKS = 60;
+    public static final float SOCIAL_CREDIT_REWARD_PER_ENERGY_GAIN = 0.2f;
 
     public static boolean LOG_EVENTS_ENABLED = false;
     public static boolean LOG_SELECTED_AGENT_ENABLED = false;

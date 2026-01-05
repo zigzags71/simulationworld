@@ -17,6 +17,7 @@ public class AgentState {
     private float hunger;
     private float stress;
     private float predictionError;
+    private float socialCredit;
     private final boolean awarenessFlag;
     private final int firstNameId;
     private final int surnameId;
@@ -25,6 +26,7 @@ public class AgentState {
     private long nextRuleId;
     private long lastFollowSignalId = -1;
     private long lastFollowRuleId = -1;
+    private long lastFollowOriginAgentId = -1;
     private long lastFollowTick = -1;
     private long lastSuccessfulEatTick = -1;
     private long lastBroadcastTick = -1;
@@ -37,6 +39,7 @@ public class AgentState {
         this.energy = energy;
         this.hunger = SimConfig.INITIAL_HUNGER;
         this.stress = SimConfig.INITIAL_STRESS;
+        this.socialCredit = SimConfig.INITIAL_SOCIAL_CREDIT;
         this.predictionError = 0f;
         this.awarenessFlag = false;
         this.firstNameId = firstNameId;
@@ -53,6 +56,7 @@ public class AgentState {
         state.hunger = state.clampMetric(hunger);
         state.stress = state.clampMetric(stress);
         state.predictionError = state.clampMetric(predictionError);
+        state.socialCredit = SimConfig.INITIAL_SOCIAL_CREDIT;
         return state;
     }
 
@@ -86,6 +90,10 @@ public class AgentState {
 
     public float getPredictionError() {
         return predictionError;
+    }
+
+    public float getSocialCredit() {
+        return socialCredit;
     }
 
     public boolean isAwarenessFlag() {
@@ -124,15 +132,21 @@ public class AgentState {
         return lastFollowTick;
     }
 
-    public void setFollowMemory(long signalId, long ruleId, long tick) {
+    public long getLastFollowOriginAgentId() {
+        return lastFollowOriginAgentId;
+    }
+
+    public void setFollowMemory(long signalId, long ruleId, long originAgentId, long tick) {
         this.lastFollowSignalId = signalId;
         this.lastFollowRuleId = ruleId;
+        this.lastFollowOriginAgentId = originAgentId;
         this.lastFollowTick = tick;
     }
 
     public void clearFollowMemory() {
         this.lastFollowSignalId = -1;
         this.lastFollowRuleId = -1;
+        this.lastFollowOriginAgentId = -1;
         this.lastFollowTick = -1;
     }
 
@@ -150,6 +164,10 @@ public class AgentState {
 
     public void setLastBroadcastTick(long tick) {
         this.lastBroadcastTick = tick;
+    }
+
+    public void addSocialCredit(float delta) {
+        this.socialCredit = clampMetric(socialCredit + delta);
     }
 
     public long allocateRuleId() {

@@ -64,6 +64,28 @@ public class OutcomeVector {
     }
 
     @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        OutcomeVector that = (OutcomeVector) o;
+        return Float.compare(that.deltaEnergy, deltaEnergy) == 0
+                && Float.compare(that.deltaHunger, deltaHunger) == 0
+                && Float.compare(that.deltaStress, deltaStress) == 0;
+    }
+
+    @Override
+    public int hashCode() {
+        int result = Float.hashCode(deltaEnergy);
+        result = 31 * result + Float.hashCode(deltaHunger);
+        result = 31 * result + Float.hashCode(deltaStress);
+        return result;
+    }
+
+    @Override
     public String toString() {
         return "OutcomeVector{" +
                 "de=" + deltaEnergy +

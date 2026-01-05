@@ -5,8 +5,10 @@ import simcore.util.MathUtil;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Deterministic container for signals with simple radius queries.
@@ -19,6 +21,7 @@ public class SignalField {
     private final int bucketsW;
     private final int bucketsH;
     private final List<List<Signal>> buckets;
+    private final Map<Long, Signal> activeEmitterSignals;
     private long nextSignalId = 1;
 
     public SignalField(int width, int height) {
@@ -31,6 +34,7 @@ public class SignalField {
         for (int i = 0; i < bucketsW * bucketsH; i++) {
             buckets.add(new ArrayList<>());
         }
+        this.activeEmitterSignals = new HashMap<>();
     }
 
     public List<Signal> getSignals() {
@@ -38,20 +42,27 @@ public class SignalField {
     }
 
     public Signal addSignal(int x, int y, int strengthBucket, float confidence, int ttl, int generation, long originAgentId,
-                            long tick) {
+                            float originSocialCredit, long emitterId, long tick) {
         strengthBucket = Math.max(0, Math.min(SimConfig.SIGNAL_STRENGTH_BINS, strengthBucket));
         confidence = MathUtil.clamp01(confidence);
         ttl = Math.max(0, ttl);
         generation = Math.max(0, generation);
         x = MathUtil.clamp(x, 0, width - 1);
         y = MathUtil.clamp(y, 0, height - 1);
+        Signal existing = activeEmitterSignals.get(emitterId);
+        if (existing != null && existing.getTtlTicks() > 0) {
+            return null;
+        }
         if (signals.size() >= SimConfig.SIGNAL_MAX_ACTIVE) {
             Signal removed = signals.remove(0);
             removeFromBucket(removed);
+            removeFromEmitterMap(removed);
         }
-        Signal signal = new Signal(nextSignalId++, x, y, strengthBucket, confidence, ttl, generation, originAgentId, tick);
+        Signal signal = new Signal(nextSignalId++, x, y, strengthBucket, confidence, ttl, generation, originAgentId,
+                originSocialCredit, emitterId, tick);
         signals.add(signal);
         addToBucket(signal);
+        activeEmitterSignals.put(emitterId, signal);
         return signal;
     }
 
@@ -62,6 +73,7 @@ public class SignalField {
             signal.decrementTtl();
             if (signal.getTtlTicks() <= 0) {
                 it.remove();
+                removeFromEmitterMap(signal);
             }
         }
         rebuildBuckets();
@@ -71,7 +83,16 @@ public class SignalField {
         return bestSignalWithinRadius(x, y, radius) != null;
     }
 
+    public boolean hasActiveSignalForEmitter(long emitterId) {
+        Signal signal = activeEmitterSignals.get(emitterId);
+        return signal != null && signal.getTtlTicks() > 0;
+    }
+
     public Signal bestSignalWithinRadius(int x, int y, int radius) {
+        return bestSignalWithinRadius(x, y, radius, -1);
+    }
+
+    public Signal bestSignalWithinRadius(int x, int y, int radius, long excludedOriginAgentId) {
         if (signals.isEmpty() || radius <= 0) {
             return null;
         }
@@ -86,6 +107,9 @@ public class SignalField {
             for (int bx = minBucketX; bx <= maxBucketX; bx++) {
                 List<Signal> bucket = buckets.get(bucketIndex(bx, by));
                 for (Signal signal : bucket) {
+                    if (signal.getOriginAgentId() == excludedOriginAgentId) {
+                        continue;
+                    }
                     int dx = signal.getX() - x;
                     int dy = signal.getY() - y;
                     int distSq = dx * dx + dy * dy;
@@ -93,7 +117,9 @@ public class SignalField {
                         continue;
                     }
                     float distPenalty = (float) Math.sqrt(distSq);
-                    float score = signal.getConfidence() * (0.5f + signal.getStrengthBucket()) - distPenalty;
+                    float score = signal.getConfidence() * (0.5f + signal.getStrengthBucket())
+                            + SimConfig.SIGNAL_SOCIAL_CREDIT_WEIGHT * signal.getOriginSocialCredit()
+                            - distPenalty;
                     if (score > bestScore || (score == bestScore && best != null && signal.getId() < best.getId())) {
                         bestScore = score;
                         best = signal;
@@ -123,6 +149,13 @@ public class SignalField {
 
     private void removeFromBucket(Signal signal) {
         buckets.get(bucketIndex(signal.getX() / BUCKET_SIZE, signal.getY() / BUCKET_SIZE)).remove(signal);
+    }
+
+    private void removeFromEmitterMap(Signal signal) {
+        Signal active = activeEmitterSignals.get(signal.getEmitterId());
+        if (active == signal) {
+            activeEmitterSignals.remove(signal.getEmitterId());
+        }
     }
 
     private int bucketIndex(int bucketX, int bucketY) {

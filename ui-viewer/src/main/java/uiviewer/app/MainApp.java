@@ -4,7 +4,9 @@ import javafx.animation.AnimationTimer;
 import javafx.application.Application;
 import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
+import javafx.geometry.Orientation;
 import javafx.geometry.Pos;
+import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.control.*;
@@ -15,6 +17,7 @@ import javafx.scene.input.ScrollEvent;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 import simcore.config.MapGenConfig;
@@ -90,7 +93,7 @@ public class MainApp extends Application {
         camera = new Camera(SimConfig.WORLD_W, SimConfig.WORLD_H);
         selectionState = new SelectionState();
 
-        Canvas canvas = new Canvas(1024, 768);
+        Canvas canvas = new Canvas();
         CanvasRenderer renderer = new CanvasRenderer(canvas);
         renderLoop = new RenderLoop(engine, renderer, camera, selectionState);
         renderLoop.setAfterRender((snapshot, now) -> {
@@ -100,15 +103,37 @@ public class MainApp extends Application {
 
         VBox leftPanel = buildOverlayPanel();
         VBox controlPanel = buildControlPanel();
-        VBox rightPanel = buildInspectorPanel();
+        TabPane inspectorTabs = buildInspectorTabs();
+
+        StackPane simContainer = new StackPane(canvas);
+        simContainer.setMinSize(0, 0);
+        canvas.widthProperty().bind(simContainer.widthProperty());
+        canvas.heightProperty().bind(simContainer.heightProperty());
+
+        VBox leftColumn = new VBox(leftPanel, controlPanel);
+        leftColumn.setFillWidth(true);
+        VBox.setVgrow(controlPanel, Priority.ALWAYS);
+        ScrollPane leftScroll = new ScrollPane(leftColumn);
+        leftScroll.setFitToWidth(true);
+        leftScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        leftScroll.setPrefWidth(280);
+
+        Label inspectorHeader = new Label("Inspectors");
+        inspectorHeader.setPadding(new Insets(6, 8, 4, 8));
+        inspectorHeader.setStyle("-fx-font-weight: bold;");
+        VBox bottomDock = new VBox(inspectorHeader, inspectorTabs);
+        bottomDock.setPrefHeight(260);
+        VBox.setVgrow(inspectorTabs, Priority.ALWAYS);
+
+        SplitPane verticalSplit = new SplitPane();
+        verticalSplit.setOrientation(Orientation.VERTICAL);
+        verticalSplit.getItems().addAll(simContainer, bottomDock);
+        verticalSplit.setDividerPositions(0.78);
 
         BorderPane root = new BorderPane();
         root.setTop(monitorBar);
-        VBox left = new VBox(leftPanel, controlPanel);
-        VBox.setVgrow(controlPanel, Priority.ALWAYS);
-        root.setLeft(left);
-        root.setCenter(canvas);
-        root.setRight(rightPanel);
+        root.setLeft(leftScroll);
+        root.setCenter(verticalSplit);
 
         attachInteractionHandlers(canvas);
 
@@ -172,9 +197,7 @@ public class MainApp extends Application {
         return box;
     }
 
-    private VBox buildInspectorPanel() {
-        VBox box = new VBox(12);
-        box.setPadding(new Insets(8));
+    private TabPane buildInspectorTabs() {
         regionInspectorPanel.setOnClearSelection(() -> {
             selectionState.clearRegion();
             selectionState.clearTile();
@@ -186,11 +209,26 @@ public class MainApp extends Application {
             regionInspectorPanel.clear();
         });
         regionInspectorPanel.setOnAgentSelected(this::selectAgentFromRegionList);
-        box.getChildren().addAll(tileHoverPanel, agentInspectorPanel, regionInspectorPanel);
-        VBox.setVgrow(agentInspectorPanel, Priority.ALWAYS);
-        VBox.setVgrow(regionInspectorPanel, Priority.ALWAYS);
-        agentInspectorPanel.setPrefHeight(300);
-        return box;
+
+        Tab hoverTab = new Tab("Hover", wrapInspectorContent(tileHoverPanel));
+        Tab agentTab = new Tab("Agent", wrapInspectorContent(agentInspectorPanel));
+        Tab regionTab = new Tab("Region", wrapInspectorContent(regionInspectorPanel));
+        hoverTab.setClosable(false);
+        agentTab.setClosable(false);
+        regionTab.setClosable(false);
+
+        TabPane tabPane = new TabPane(hoverTab, agentTab, regionTab);
+        tabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
+        VBox.setVgrow(tabPane, Priority.ALWAYS);
+        return tabPane;
+    }
+
+    private ScrollPane wrapInspectorContent(Node node) {
+        ScrollPane pane = new ScrollPane(node);
+        pane.setFitToWidth(true);
+        pane.setFitToHeight(true);
+        pane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        return pane;
     }
 
     private VBox buildControlPanel() {

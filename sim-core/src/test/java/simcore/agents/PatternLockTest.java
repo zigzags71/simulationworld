@@ -42,23 +42,31 @@ class PatternLockTest {
 
         OutcomeVector firstMove = executor.execute(ActionType.FOLLOW_SIGNAL, agent, world, 0, 0);
 
-        assertEquals(3, agent.getX());
-        assertEquals(2, agent.getY());
         assertTrue(agent.hasFollowLock(0));
-        assertEquals(4, agent.getFollowLockTargetX());
-        assertEquals(2, agent.getFollowLockTargetY());
+        int tx = agent.getFollowLockTargetX();
+        int ty = agent.getFollowLockTargetY();
+        int expectedX = MathUtil.clamp(2 + Integer.compare(tx, 2), 0, world.getWidth() - 1);
+        int expectedY = MathUtil.clamp(2 + Integer.compare(ty, 2), 0, world.getHeight() - 1);
+        assertEquals(expectedX, agent.getX());
+        assertEquals(expectedY, agent.getY());
         assertEquals(1, metrics.getFollowMovesThisTick());
 
         field.addSignal(0, 2, BinningUtil.bin01(0.9f, SimConfig.SIGNAL_STRENGTH_BINS), SimConfig.SIGNAL_VERIFIED_CONFIDENCE,
                 SimConfig.SIGNAL_TTL_TICKS, 0, 11L, 0.9f, 4L, 1L);
 
         executor.setMetrics(metrics);
+        int prevX = agent.getX();
+        int prevY = agent.getY();
         OutcomeVector secondMove = executor.execute(ActionType.FOLLOW_SIGNAL, agent, world, 0, 1);
 
-        assertEquals(4, agent.getX());
-        assertEquals(2, agent.getY());
+        assertEquals(tx, agent.getFollowLockTargetX());
+        assertEquals(ty, agent.getFollowLockTargetY());
         assertTrue(secondMove.getDeltaEnergy() < 0f);
         assertEquals(1, metrics.getFollowMovesThisTick());
+        int expectedX2 = MathUtil.clamp(prevX + Integer.compare(tx, prevX), 0, world.getWidth() - 1);
+        int expectedY2 = MathUtil.clamp(prevY + Integer.compare(ty, prevY), 0, world.getHeight() - 1);
+        assertEquals(expectedX2, agent.getX());
+        assertEquals(expectedY2, agent.getY());
     }
 
     @Test

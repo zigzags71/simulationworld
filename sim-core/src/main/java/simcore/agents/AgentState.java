@@ -30,11 +30,21 @@ public class AgentState {
     private long lastFollowTick = -1;
     private long lastSuccessfulEatTick = -1;
     private long lastBroadcastTick = -1;
+    private int followLockTargetX;
+    private int followLockTargetY;
+    private long followLockUntilTick = -1;
+    private int foodLockTargetX;
+    private int foodLockTargetY;
+    private long foodLockUntilTick = -1;
+    private int lastX;
+    private int lastY;
 
     public AgentState(AgentId id, int x, int y, float energy, int firstNameId, int surnameId, int cultureId) {
         this.id = id;
         this.x = x;
         this.y = y;
+        this.lastX = x;
+        this.lastY = y;
         this.ageTicks = 0;
         this.energy = energy;
         this.hunger = SimConfig.INITIAL_HUNGER;
@@ -189,6 +199,63 @@ public class AgentState {
     public void moveTo(int newX, int newY) {
         this.x = newX;
         this.y = newY;
+    }
+
+    public void snapshotLastPos() {
+        this.lastX = x;
+        this.lastY = y;
+    }
+
+    public int getLastX() {
+        return lastX;
+    }
+
+    public int getLastY() {
+        return lastY;
+    }
+
+    public boolean hasFollowLock(long tick) {
+        return tick <= followLockUntilTick;
+    }
+
+    public void setFollowLock(int tx, int ty, long untilTick) {
+        this.followLockTargetX = tx;
+        this.followLockTargetY = ty;
+        this.followLockUntilTick = untilTick;
+    }
+
+    public void clearFollowLock() {
+        this.followLockUntilTick = -1;
+    }
+
+    public int getFollowLockTargetX() {
+        return followLockTargetX;
+    }
+
+    public int getFollowLockTargetY() {
+        return followLockTargetY;
+    }
+
+    public boolean hasFoodLock(long tick) {
+        return tick <= foodLockUntilTick;
+    }
+
+    public void setFoodLock(int tx, int ty, long untilTick) {
+        this.foodLockTargetX = tx;
+        this.foodLockTargetY = ty;
+        this.foodLockUntilTick = untilTick;
+    }
+
+    public void clearFoodLock() {
+        this.foodLockUntilTick = -1;
+    }
+
+    public int getFoodLockTargetX() {
+        return foodLockTargetX;
+    }
+
+    public int getFoodLockTargetY() {
+        return foodLockTargetY;
     }
 
     public void applyNutrition(float hungerGain, float energyGain) {

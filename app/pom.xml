@@ -6,7 +6,7 @@
     <parent>
         <groupId>org.example</groupId>
         <artifactId>simulationworld</artifactId>
-    <version>0.4.12</version>
+    <version>0.4.14</version>
     </parent>
     <artifactId>app</artifactId>
     <packaging>jar</packaging>

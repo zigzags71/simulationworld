@@ -195,6 +195,17 @@ public class ActionExecutor {
         return directedMove(agent, world, targetX, targetY);
     }
 
+    public OutcomeVector executeFollowLockMove(AgentState agent, WorldGrid world, long tickIndex) {
+        if (!agent.hasFollowLock(tickIndex)) {
+            return null;
+        }
+        OutcomeVector delta = directedMove(agent, world, agent.getFollowLockTargetX(), agent.getFollowLockTargetY());
+        if (agent.getX() == agent.getFollowLockTargetX() && agent.getY() == agent.getFollowLockTargetY()) {
+            agent.clearFollowLock();
+        }
+        return delta;
+    }
+
     public void resolveEatRequests(WorldGrid world, OutcomeVector[] actionDeltas, EventBus<SimulationEvent> eventBus) {
         float[] food = world.getFoodField();
         int requestCount = eatRequests.getSize();

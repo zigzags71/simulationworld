@@ -81,13 +81,6 @@ public class AgentSystem {
                 skipBuffer[i] = true;
                 continue;
             }
-            ContextKey contextKey = buildContext(agent, world, crowding, tickIndex);
-            Rule rule = RuleSelector.choose(RuleSelector.applicable(agent.getRulebook(), contextKey), agent, random);
-            if (rule == null) {
-                skipBuffer[i] = true;
-                continue;
-            }
-            chosenRules[i] = rule;
             beforeStates[i] = OutcomeVector.fromAgent(agent.getEnergy(), agent.getHunger(), agent.getStress());
             int idx = MathUtil.index(agent.getX(), agent.getY(), width);
             float hazardHere = world.getHazardField()[idx];
@@ -96,6 +89,17 @@ public class AgentSystem {
                     -SimConfig.ENERGY_DRAIN_PER_TICK - hazardHere * SimConfig.HAZARD_ENERGY_DRAIN_PER_TICK,
                     -SimConfig.HUNGER_DRAIN_PER_TICK,
                     hazardHere * SimConfig.HAZARD_STRESS_GAIN_PER_TICK - SimConfig.STRESS_RECOVERY_PER_TICK);
+            if (agent.hasFollowLock(tickIndex)) {
+                actionDeltas[i] = actionExecutor.executeFollowLockMove(agent, world, tickIndex);
+                continue;
+            }
+            ContextKey contextKey = buildContext(agent, world, crowding, tickIndex);
+            Rule rule = RuleSelector.choose(RuleSelector.applicable(agent.getRulebook(), contextKey), agent, random);
+            if (rule == null) {
+                skipBuffer[i] = true;
+                continue;
+            }
+            chosenRules[i] = rule;
             if (rule.getAction() == ActionType.MOVE) {
                 OutcomeVector lockedMove = actionExecutor.executeFoodLockMoveIfActive(agent, world, tickIndex);
                 if (lockedMove != null) {
@@ -121,7 +125,7 @@ public class AgentSystem {
             }
             AgentState agent = agentBuffer[i];
             Rule rule = chosenRules[i];
-            if (agent == null || rule == null) {
+            if (agent == null) {
                 continue;
             }
             OutcomeVector before = beforeStates[i];
@@ -146,13 +150,15 @@ public class AgentSystem {
             OutcomeVector totalDelta = baseDeltas[i].add(actionDelta);
             agent.applyTick(totalDelta.getDeltaEnergy(), totalDelta.getDeltaHunger(), totalDelta.getDeltaStress());
             OutcomeVector after = OutcomeVector.fromAgent(agent.getEnergy(), agent.getHunger(), agent.getStress());
-            OutcomeVector observed = after.deltaFrom(before);
-            float error = observed.distanceTo(rule.getExpected(), false);
-            applyTrustUpdate(rule, error, tickIndex);
-            agent.updatePredictionError(error);
-            if (eventBus != null && SimConfig.LOG_SELECTED_AGENT_ENABLED) {
-                eventBus.publish(new RuleExecutedEvent(agent.getId().value(), rule.getRuleId(), rule.getAction(), rule.getTrust(),
-                        error, tickIndex));
+            if (rule != null) {
+                OutcomeVector observed = after.deltaFrom(before);
+                float error = observed.distanceTo(rule.getExpected(), false);
+                applyTrustUpdate(rule, error, tickIndex);
+                agent.updatePredictionError(error);
+                if (eventBus != null && SimConfig.LOG_SELECTED_AGENT_ENABLED) {
+                    eventBus.publish(new RuleExecutedEvent(agent.getId().value(), rule.getRuleId(), rule.getAction(), rule.getTrust(),
+                            error, tickIndex));
+                }
             }
             if (agent.isDead()) {
                 agents.remove(i);

@@ -26,12 +26,48 @@ public final class RuleSelector {
             }
         }
         if (!out.isEmpty()) {
-            return out;
+            return filterByAffordance(out, key, normals);
         }
         if (!normals.isEmpty()) {
-            return normals;
+            return filterByAffordance(normals, key, normals);
         }
         return rules;
+    }
+
+    private static List<Rule> filterByAffordance(List<Rule> candidates, ContextKey key, List<Rule> normals) {
+        List<Rule> filtered = new ArrayList<>();
+        for (Rule rule : candidates) {
+            if (isActionAvailable(rule.getAction(), key)) {
+                filtered.add(rule);
+            }
+        }
+        if (!filtered.isEmpty()) {
+            return filtered;
+        }
+        List<Rule> fallback = new ArrayList<>();
+        for (Rule rule : normals) {
+            if (rule.getAction() == ActionType.MOVE || rule.getAction() == ActionType.IDLE) {
+                fallback.add(rule);
+            }
+        }
+        if (!fallback.isEmpty()) {
+            return fallback;
+        }
+        return filtered;
+    }
+
+    private static boolean isActionAvailable(ActionType action, ContextKey key) {
+        int affordance = key.getFoodAffordance();
+        boolean canEatHere = (affordance & 1) != 0;
+        boolean hasSignal = (affordance & (1 << 1)) != 0;
+        boolean emitterNearby = (affordance & (1 << 2)) != 0;
+        boolean broadcastReady = (affordance & (1 << 3)) != 0;
+        return switch (action) {
+            case EAT -> canEatHere;
+            case FOLLOW_SIGNAL -> hasSignal && !canEatHere;
+            case BROADCAST_SIGNAL -> emitterNearby && broadcastReady;
+            case MOVE, IDLE -> true;
+        };
     }
 
     public static Rule choose(List<Rule> candidates, AgentState agent, Random random) {

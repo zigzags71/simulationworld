@@ -80,7 +80,7 @@ public class AgentSystem {
                 skipBuffer[i] = true;
                 continue;
             }
-            ContextKey contextKey = buildContext(agent, world, crowding);
+            ContextKey contextKey = buildContext(agent, world, crowding, tickIndex);
             Rule rule = RuleSelector.choose(RuleSelector.applicable(agent.getRulebook(), contextKey), agent, random);
             if (rule == null) {
                 skipBuffer[i] = true;
@@ -111,6 +111,20 @@ public class AgentSystem {
             OutcomeVector actionDelta = actionDeltas[i] != null ? actionDeltas[i] : OutcomeVector.zero();
             if (actionDelta.getDeltaHunger() > 0f || actionDelta.getDeltaEnergy() > 0f) {
                 agent.setLastSuccessfulEatTick(tickIndex);
+                if (agent.getLastFollowOriginAgentId() != -1 && agent.getLastFollowOriginAgentId() != agent.getId().value()) {
+                    long followAge = tickIndex - agent.getLastFollowTick();
+                    if (followAge <= SimConfig.SOCIAL_CREDIT_REWARD_WINDOW_TICKS) {
+                        AgentState broadcaster = findAgentById(agent.getLastFollowOriginAgentId());
+                        if (broadcaster != null && !broadcaster.isDead()) {
+                            float reward = MathUtil.clamp01(
+                                    SimConfig.SOCIAL_CREDIT_REWARD_PER_ENERGY_GAIN * actionDelta.getDeltaEnergy());
+                            if (reward > 0f) {
+                                broadcaster.addSocialCredit(reward);
+                            }
+                        }
+                        agent.clearFollowMemory();
+                    }
+                }
             }
             OutcomeVector totalDelta = baseDeltas[i].add(actionDelta);
             agent.applyTick(totalDelta.getDeltaEnergy(), totalDelta.getDeltaHunger(), totalDelta.getDeltaStress());
@@ -242,7 +256,7 @@ public class AgentSystem {
         return counts;
     }
 
-    private ContextKey buildContext(AgentState agent, WorldGrid world, int[] crowding) {
+    private ContextKey buildContext(AgentState agent, WorldGrid world, int[] crowding, long tickIndex) {
         int width = world.getWidth();
         int idx = MathUtil.index(agent.getX(), agent.getY(), width);
         int bins = SimConfig.FIELD_BIN_COUNT;
@@ -268,11 +282,16 @@ public class AgentSystem {
                 break;
             }
         }
+        boolean cooldownReady = agent.getLastBroadcastTick() < 0
+                || (tickIndex - agent.getLastBroadcastTick()) >= SimConfig.SIGNAL_BROADCAST_COOLDOWN_TICKS;
+        if (cooldownReady) {
+            affordance |= 1 << 3;
+        }
         return new ContextKey(hungerBin, energyBin, stressBin, foodBin, hazardBin, crowdBin, awareness, affordance);
     }
 
     private void seedRules(AgentState agent, WorldGrid world, int[] crowding) {
-        ContextKey contextKey = buildContext(agent, world, crowding);
+        ContextKey contextKey = buildContext(agent, world, crowding, 0);
         OutcomeVector idleExpected = new OutcomeVector(-SimConfig.ENERGY_DRAIN_PER_TICK,
                 -SimConfig.HUNGER_DRAIN_PER_TICK, -SimConfig.STRESS_RECOVERY_PER_TICK - SimConfig.IDLE_STRESS_RECOVERY_BONUS);
         OutcomeVector moveExpected = new OutcomeVector(-SimConfig.ENERGY_DRAIN_PER_TICK - SimConfig.MOVE_ENERGY_COST,

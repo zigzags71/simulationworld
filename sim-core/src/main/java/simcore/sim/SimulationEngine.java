@@ -212,7 +212,7 @@ public class SimulationEngine {
         AgentState agent = agents.findAgentById(selectedAgentId);
         if (agent != null) {
             eventBus.publish(new SelectedAgentSnapshotEvent(agent.getId().value(), agent.getEnergy(), agent.getHunger(),
-                    agent.getStress(), agent.getPredictionError(), currentTick));
+                    agent.getStress(), agent.getPredictionError(), agent.getSocialCredit(), currentTick));
         }
     }
 

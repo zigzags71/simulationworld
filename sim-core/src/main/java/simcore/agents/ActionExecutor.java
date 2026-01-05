@@ -98,15 +98,20 @@ public class ActionExecutor {
                 && (tickIndex - agent.getLastSuccessfulEatTick()) <= SimConfig.SIGNAL_BROADCAST_AFTER_EAT_WINDOW;
         boolean cooldownReady = agent.getLastBroadcastTick() < 0
                 || (tickIndex - agent.getLastBroadcastTick()) >= SimConfig.SIGNAL_BROADCAST_COOLDOWN_TICKS;
+        boolean signalCreated = false;
         if ((ateRecently || emitterNearby) && cooldownReady) {
             if (localFood >= SimConfig.FOOD_MIN_TO_EAT || emitterNearby) {
                 int strengthBucket = BinningUtil.bin01(localFood, SimConfig.SIGNAL_STRENGTH_BINS);
                 world.getSignalField().addSignal(agent.getX(), agent.getY(), strengthBucket, SimConfig.SIGNAL_BASE_CONFIDENCE,
-                        SimConfig.SIGNAL_TTL_TICKS, 0, agent.getId().value(), tickIndex);
+                        SimConfig.SIGNAL_TTL_TICKS, 0, agent.getId().value(), agent.getSocialCredit(), tickIndex);
                 agent.setLastBroadcastTick(tickIndex);
+                signalCreated = true;
             }
         }
-        return new OutcomeVector(-SimConfig.SIGNAL_BROADCAST_COST_ENERGY, -SimConfig.SIGNAL_BROADCAST_COST_HUNGER, 0f);
+        if (signalCreated) {
+            return new OutcomeVector(-SimConfig.SIGNAL_BROADCAST_COST_ENERGY, -SimConfig.SIGNAL_BROADCAST_COST_HUNGER, 0f);
+        }
+        return OutcomeVector.zero();
     }
 
     private OutcomeVector followSignalMove(AgentState agent, WorldGrid world, long tickIndex) {
@@ -136,7 +141,7 @@ public class ActionExecutor {
             }
         }
         agent.moveTo(targetX, targetY);
-        agent.setFollowMemory(best.getId(), -1, tickIndex);
+        agent.setFollowMemory(best.getId(), -1, best.getOriginAgentId(), tickIndex);
         return new OutcomeVector(-SimConfig.MOVE_ENERGY_COST, -SimConfig.MOVE_HUNGER_COST, 0f);
     }
 

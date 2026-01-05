@@ -18,7 +18,7 @@ class RuleSelectorTest {
         AgentState agent = AgentState.forTest(new AgentId(1), 0, 0, SimConfig.INITIAL_ENERGY,
                 SimConfig.INITIAL_HUNGER, SimConfig.INITIAL_STRESS, 0f);
         agent.applyTick(0f, -0.4f, 0.1f);
-        ContextKey key = new ContextKey(0, 0, 0, 0, 0, 0, 0, 0);
+        ContextKey key = new ContextKey(0, 0, 0, 0, 0, 0, 0, 1);
         List<Rule> rules = new ArrayList<>();
         rules.add(new Rule(1, RuleType.NORMAL, key, ActionType.EAT, OutcomeVector.zero(), 0.9f));
         rules.add(new Rule(2, RuleType.NORMAL, key, ActionType.MOVE, OutcomeVector.zero(), 0.1f));

@@ -38,7 +38,7 @@ public class SignalField {
     }
 
     public Signal addSignal(int x, int y, int strengthBucket, float confidence, int ttl, int generation, long originAgentId,
-                            long tick) {
+                            float originSocialCredit, long tick) {
         strengthBucket = Math.max(0, Math.min(SimConfig.SIGNAL_STRENGTH_BINS, strengthBucket));
         confidence = MathUtil.clamp01(confidence);
         ttl = Math.max(0, ttl);
@@ -49,7 +49,8 @@ public class SignalField {
             Signal removed = signals.remove(0);
             removeFromBucket(removed);
         }
-        Signal signal = new Signal(nextSignalId++, x, y, strengthBucket, confidence, ttl, generation, originAgentId, tick);
+        Signal signal = new Signal(nextSignalId++, x, y, strengthBucket, confidence, ttl, generation, originAgentId,
+                originSocialCredit, tick);
         signals.add(signal);
         addToBucket(signal);
         return signal;
@@ -93,7 +94,9 @@ public class SignalField {
                         continue;
                     }
                     float distPenalty = (float) Math.sqrt(distSq);
-                    float score = signal.getConfidence() * (0.5f + signal.getStrengthBucket()) - distPenalty;
+                    float score = signal.getConfidence() * (0.5f + signal.getStrengthBucket())
+                            + SimConfig.SIGNAL_SOCIAL_CREDIT_WEIGHT * signal.getOriginSocialCredit()
+                            - distPenalty;
                     if (score > bestScore || (score == bestScore && best != null && signal.getId() < best.getId())) {
                         bestScore = score;
                         best = signal;

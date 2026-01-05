@@ -51,8 +51,9 @@ public class SimulationLogger {
         }
         if (event instanceof SelectedAgentSnapshotEvent snap) {
             if (SimConfig.LOG_SELECTED_AGENT_ENABLED && snap.getAgentId() == selectedAgentSupplier.getAsLong()) {
-                out.printf("[tick=%d] agent %d energy=%.3f hunger=%.3f stress=%.3f predErr=%.4f%n", snap.getTick(),
-                        snap.getAgentId(), snap.getEnergy(), snap.getHunger(), snap.getStress(), snap.getPredictionError());
+                out.printf("[tick=%d] agent %d energy=%.3f hunger=%.3f stress=%.3f predErr=%.4f social=%.3f%n",
+                        snap.getTick(), snap.getAgentId(), snap.getEnergy(), snap.getHunger(), snap.getStress(),
+                        snap.getPredictionError(), snap.getSocialCredit());
             }
             return;
         }

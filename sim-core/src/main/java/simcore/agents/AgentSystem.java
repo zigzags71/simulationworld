@@ -90,8 +90,11 @@ public class AgentSystem {
                     -SimConfig.HUNGER_DRAIN_PER_TICK,
                     hazardHere * SimConfig.HAZARD_STRESS_GAIN_PER_TICK - SimConfig.STRESS_RECOVERY_PER_TICK);
             if (agent.hasFollowLock(tickIndex)) {
-                actionDeltas[i] = actionExecutor.executeFollowLockMove(agent, world, tickIndex);
-                continue;
+                OutcomeVector followDelta = actionExecutor.executeFollowLockMove(agent, world, tickIndex);
+                if (followDelta != null) {
+                    actionDeltas[i] = followDelta;
+                    continue;
+                }
             }
             ContextKey contextKey = buildContext(agent, world, crowding, tickIndex);
             Rule rule = RuleSelector.choose(RuleSelector.applicable(agent.getRulebook(), contextKey), agent, random);

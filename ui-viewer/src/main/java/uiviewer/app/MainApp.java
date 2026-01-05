@@ -4,7 +4,9 @@ import javafx.animation.AnimationTimer;
 import javafx.application.Application;
 import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
+import javafx.geometry.Orientation;
 import javafx.geometry.Pos;
+import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.control.*;
@@ -15,7 +17,6 @@ import javafx.scene.input.ScrollEvent;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
-import javafx.geometry.Orientation;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
@@ -105,18 +106,33 @@ public class MainApp extends Application {
         TabPane inspectorTabs = buildInspectorTabs();
 
         StackPane simContainer = new StackPane(canvas);
+        simContainer.setMinSize(0, 0);
         canvas.widthProperty().bind(simContainer.widthProperty());
         canvas.heightProperty().bind(simContainer.heightProperty());
 
-        SplitPane verticalSplit = new SplitPane(simContainer, inspectorTabs);
+        VBox leftColumn = new VBox(leftPanel, controlPanel);
+        leftColumn.setFillWidth(true);
+        VBox.setVgrow(controlPanel, Priority.ALWAYS);
+        ScrollPane leftScroll = new ScrollPane(leftColumn);
+        leftScroll.setFitToWidth(true);
+        leftScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        leftScroll.setPrefWidth(280);
+
+        Label inspectorHeader = new Label("Inspectors");
+        inspectorHeader.setPadding(new Insets(6, 8, 4, 8));
+        inspectorHeader.setStyle("-fx-font-weight: bold;");
+        VBox bottomDock = new VBox(inspectorHeader, inspectorTabs);
+        bottomDock.setPrefHeight(260);
+        VBox.setVgrow(inspectorTabs, Priority.ALWAYS);
+
+        SplitPane verticalSplit = new SplitPane();
         verticalSplit.setOrientation(Orientation.VERTICAL);
-        verticalSplit.setDividerPositions(0.75);
+        verticalSplit.getItems().addAll(simContainer, bottomDock);
+        verticalSplit.setDividerPositions(0.78);
 
         BorderPane root = new BorderPane();
         root.setTop(monitorBar);
-        VBox left = new VBox(leftPanel, controlPanel);
-        VBox.setVgrow(controlPanel, Priority.ALWAYS);
-        root.setLeft(left);
+        root.setLeft(leftScroll);
         root.setCenter(verticalSplit);
 
         attachInteractionHandlers(canvas);
@@ -194,18 +210,25 @@ public class MainApp extends Application {
         });
         regionInspectorPanel.setOnAgentSelected(this::selectAgentFromRegionList);
 
-        Tab hoverTab = new Tab("Hover", tileHoverPanel);
-        Tab agentTab = new Tab("Agent", agentInspectorPanel);
-        Tab regionTab = new Tab("Region", regionInspectorPanel);
+        Tab hoverTab = new Tab("Hover", wrapInspectorContent(tileHoverPanel));
+        Tab agentTab = new Tab("Agent", wrapInspectorContent(agentInspectorPanel));
+        Tab regionTab = new Tab("Region", wrapInspectorContent(regionInspectorPanel));
         hoverTab.setClosable(false);
         agentTab.setClosable(false);
         regionTab.setClosable(false);
 
         TabPane tabPane = new TabPane(hoverTab, agentTab, regionTab);
         tabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
-        tabPane.setPrefHeight(300);
         VBox.setVgrow(tabPane, Priority.ALWAYS);
         return tabPane;
+    }
+
+    private ScrollPane wrapInspectorContent(Node node) {
+        ScrollPane pane = new ScrollPane(node);
+        pane.setFitToWidth(true);
+        pane.setFitToHeight(true);
+        pane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        return pane;
     }
 
     private VBox buildControlPanel() {

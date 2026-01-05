@@ -7,6 +7,10 @@ import simcore.util.BinningUtil;
 import simcore.util.MathUtil;
 import simcore.world.WorldGrid;
 import simcore.world.signals.SignalField;
+import simcore.rules.ActionType;
+
+import simcore.agents.AgentId;
+import simcore.agents.AgentTickMetrics;
 
 import java.util.Random;
 

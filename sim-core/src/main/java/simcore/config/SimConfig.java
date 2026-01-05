@@ -29,6 +29,10 @@ public final class SimConfig {
     public static final float STRESS_RECOVERY_PER_TICK = 0.0006f;
     public static final float HAZARD_ENERGY_DRAIN_PER_TICK = 0.0025f;
     public static final float HAZARD_STRESS_GAIN_PER_TICK = 0.0020f;
+    public static final float AWARE_T1 = 0.25f;
+    public static final float AWARE_T2 = 0.5f;
+    public static final float AWARE_T3 = 0.75f;
+    public static final float AWARE_HYST = 0.05f;
 
     public static final float CONSUME_HUNGER_THRESHOLD = 0.65f;
     public static final float FOOD_MIN_TO_EAT = 0.02f;

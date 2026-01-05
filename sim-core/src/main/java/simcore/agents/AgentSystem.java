@@ -152,6 +152,8 @@ public class AgentSystem {
             }
             OutcomeVector totalDelta = baseDeltas[i].add(actionDelta);
             agent.applyTick(totalDelta.getDeltaEnergy(), totalDelta.getDeltaHunger(), totalDelta.getDeltaStress());
+            agent.updateAwarenessLevelFromStress(SimConfig.AWARE_T1, SimConfig.AWARE_T2, SimConfig.AWARE_T3,
+                    SimConfig.AWARE_HYST);
             OutcomeVector after = OutcomeVector.fromAgent(agent.getEnergy(), agent.getHunger(), agent.getStress());
             if (rule != null) {
                 OutcomeVector observed = after.deltaFrom(before);

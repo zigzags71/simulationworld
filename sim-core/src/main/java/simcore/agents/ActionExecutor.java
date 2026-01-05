@@ -90,11 +90,11 @@ public class ActionExecutor {
     private OutcomeVector broadcast(AgentState agent, WorldGrid world, long tickIndex) {
         int idx = MathUtil.index(agent.getX(), agent.getY(), world.getWidth());
         float localFood = world.getFoodField()[idx];
-        boolean emitterNearby = world.findEmitterAt(agent.getX(), agent.getY()) != null;
-        if (!emitterNearby) {
+        FoodEmitter nearbyEmitter = world.findEmitterAt(agent.getX(), agent.getY());
+        if (nearbyEmitter == null) {
             for (FoodEmitter emitter : world.getEmittersView()) {
                 if (Math.abs(emitter.getX() - agent.getX()) <= 2 && Math.abs(emitter.getY() - agent.getY()) <= 2) {
-                    emitterNearby = true;
+                    nearbyEmitter = emitter;
                     break;
                 }
             }
@@ -104,16 +104,18 @@ public class ActionExecutor {
         boolean cooldownReady = agent.getLastBroadcastTick() < 0
                 || (tickIndex - agent.getLastBroadcastTick()) >= SimConfig.SIGNAL_BROADCAST_COOLDOWN_TICKS;
         boolean signalCreated = false;
-        if ((ateRecently || emitterNearby) && cooldownReady) {
-            if (localFood >= SimConfig.FOOD_MIN_TO_EAT || emitterNearby) {
+        if ((ateRecently || nearbyEmitter != null) && cooldownReady && nearbyEmitter != null) {
+            if (localFood >= SimConfig.FOOD_MIN_TO_EAT || nearbyEmitter != null) {
                 int strengthBucket = BinningUtil.bin01(localFood, SimConfig.SIGNAL_STRENGTH_BINS);
-                world.getSignalField().addSignal(agent.getX(), agent.getY(), strengthBucket, SimConfig.SIGNAL_BASE_CONFIDENCE,
-                        SimConfig.SIGNAL_TTL_TICKS, 0, agent.getId().value(), agent.getSocialCredit(), tickIndex);
-                agent.setLastBroadcastTick(tickIndex);
-                if (metrics != null) {
-                    metrics.incrementSignalsEmitted();
+                Signal signal = world.getSignalField().addSignal(agent.getX(), agent.getY(), strengthBucket, SimConfig.SIGNAL_BASE_CONFIDENCE,
+                        SimConfig.SIGNAL_TTL_TICKS, 0, agent.getId().value(), agent.getSocialCredit(), nearbyEmitter.getId(), tickIndex);
+                if (signal != null) {
+                    agent.setLastBroadcastTick(tickIndex);
+                    if (metrics != null) {
+                        metrics.incrementSignalsEmitted();
+                    }
+                    signalCreated = true;
                 }
-                signalCreated = true;
             }
         }
         if (signalCreated) {
@@ -130,7 +132,7 @@ public class ActionExecutor {
         int baseRadius = SimConfig.SIGNAL_SENSE_RADIUS_BASE;
         int dynamic = (int) (agent.getPredictionError() * (SimConfig.SIGNAL_SENSE_RADIUS_MAX - baseRadius));
         int radius = Math.min(SimConfig.SIGNAL_SENSE_RADIUS_MAX, baseRadius + Math.max(0, dynamic));
-        Signal best = field.bestSignalWithinRadius(agent.getX(), agent.getY(), radius);
+        Signal best = field.bestSignalWithinRadius(agent.getX(), agent.getY(), radius, agent.getId().value());
         if (best == null) {
             return move(agent, world);
         }

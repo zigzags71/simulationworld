@@ -39,7 +39,7 @@ class ActionExecutorMetricsTest {
         boolean[] water = new boolean[9];
         WorldGrid world = new WorldGrid(3, 3, 7L, food, hazard, water);
         world.getSignalField().addSignal(2, 1, BinningUtil.bin01(0.2f, SimConfig.SIGNAL_STRENGTH_BINS),
-                SimConfig.SIGNAL_BASE_CONFIDENCE, SimConfig.SIGNAL_TTL_TICKS, 0, 3L, 0.5f, 0L);
+                SimConfig.SIGNAL_BASE_CONFIDENCE, SimConfig.SIGNAL_TTL_TICKS, 0, 3L, 0.5f, 1L, 0L);
         AgentState agent = AgentState.forTest(new AgentId(2), 1, 1, SimConfig.INITIAL_ENERGY,
                 SimConfig.INITIAL_HUNGER, SimConfig.INITIAL_STRESS, 0f);
         AgentTickMetrics metrics = new AgentTickMetrics();

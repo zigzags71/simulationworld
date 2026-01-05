@@ -6,8 +6,12 @@ import simcore.events.EventBus;
 import simcore.events.SimulationEvent;
 import simcore.rules.ActionType;
 import simcore.rules.OutcomeVector;
+import simcore.util.BinningUtil;
 import simcore.util.MathUtil;
 import simcore.world.WorldGrid;
+import simcore.world.objects.FoodEmitter;
+import simcore.world.signals.Signal;
+import simcore.world.signals.SignalField;
 
 import java.util.Random;
 
@@ -30,6 +34,8 @@ public class ActionExecutor {
             case IDLE -> idle();
             case MOVE -> move(agent, world);
             case EAT -> eat(agent, world, agentSlot, tickIndex);
+            case BROADCAST_SIGNAL -> broadcast(agent, world, tickIndex);
+            case FOLLOW_SIGNAL -> followSignalMove(agent, world, tickIndex);
         };
     }
 
@@ -74,6 +80,64 @@ public class ActionExecutor {
         int idx = MathUtil.index(agent.getX(), agent.getY(), world.getWidth());
         eatRequests.add(idx, agent.getId().value(), agentSlot, SimConfig.FOOD_CONSUME_RATE, tickIndex);
         return OutcomeVector.zero();
+    }
+
+    private OutcomeVector broadcast(AgentState agent, WorldGrid world, long tickIndex) {
+        int idx = MathUtil.index(agent.getX(), agent.getY(), world.getWidth());
+        float localFood = world.getFoodField()[idx];
+        boolean emitterNearby = world.findEmitterAt(agent.getX(), agent.getY()) != null;
+        if (!emitterNearby) {
+            for (FoodEmitter emitter : world.getEmittersView()) {
+                if (Math.abs(emitter.getX() - agent.getX()) <= 2 && Math.abs(emitter.getY() - agent.getY()) <= 2) {
+                    emitterNearby = true;
+                    break;
+                }
+            }
+        }
+        boolean ateRecently = agent.getLastSuccessfulEatTick() >= 0
+                && (tickIndex - agent.getLastSuccessfulEatTick()) <= SimConfig.SIGNAL_BROADCAST_AFTER_EAT_WINDOW;
+        boolean cooldownReady = agent.getLastBroadcastTick() < 0
+                || (tickIndex - agent.getLastBroadcastTick()) >= SimConfig.SIGNAL_BROADCAST_COOLDOWN_TICKS;
+        if ((ateRecently || emitterNearby) && cooldownReady) {
+            if (localFood >= SimConfig.FOOD_MIN_TO_EAT || emitterNearby) {
+                int strengthBucket = BinningUtil.bin01(localFood, SimConfig.SIGNAL_STRENGTH_BINS);
+                world.getSignalField().addSignal(agent.getX(), agent.getY(), strengthBucket, SimConfig.SIGNAL_BASE_CONFIDENCE,
+                        SimConfig.SIGNAL_TTL_TICKS, 0, agent.getId().value(), tickIndex);
+                agent.setLastBroadcastTick(tickIndex);
+            }
+        }
+        return new OutcomeVector(-SimConfig.SIGNAL_BROADCAST_COST_ENERGY, -SimConfig.SIGNAL_BROADCAST_COST_HUNGER, 0f);
+    }
+
+    private OutcomeVector followSignalMove(AgentState agent, WorldGrid world, long tickIndex) {
+        SignalField field = world.getSignalField();
+        if (field.isEmpty()) {
+            return move(agent, world);
+        }
+        int baseRadius = SimConfig.SIGNAL_SENSE_RADIUS_BASE;
+        int dynamic = (int) (agent.getPredictionError() * (SimConfig.SIGNAL_SENSE_RADIUS_MAX - baseRadius));
+        int radius = Math.min(SimConfig.SIGNAL_SENSE_RADIUS_MAX, baseRadius + Math.max(0, dynamic));
+        Signal best = field.bestSignalWithinRadius(agent.getX(), agent.getY(), radius);
+        if (best == null) {
+            return move(agent, world);
+        }
+        int dx = Integer.compare(best.getX(), agent.getX());
+        int dy = Integer.compare(best.getY(), agent.getY());
+        int targetX = MathUtil.clamp(agent.getX() + dx, 0, world.getWidth() - 1);
+        int targetY = MathUtil.clamp(agent.getY() + dy, 0, world.getHeight() - 1);
+        int idx = MathUtil.index(targetX, targetY, world.getWidth());
+        if (world.getWaterMask()[idx]) {
+            if (!world.getWaterMask()[MathUtil.index(MathUtil.clamp(agent.getX() + dx, 0, world.getWidth() - 1), agent.getY(), world.getWidth())]) {
+                targetX = MathUtil.clamp(agent.getX() + dx, 0, world.getWidth() - 1);
+                targetY = agent.getY();
+            } else if (!world.getWaterMask()[MathUtil.index(agent.getX(), MathUtil.clamp(agent.getY() + dy, 0, world.getHeight() - 1), world.getWidth())]) {
+                targetX = agent.getX();
+                targetY = MathUtil.clamp(agent.getY() + dy, 0, world.getHeight() - 1);
+            }
+        }
+        agent.moveTo(targetX, targetY);
+        agent.setFollowMemory(best.getId(), -1, tickIndex);
+        return new OutcomeVector(-SimConfig.MOVE_ENERGY_COST, -SimConfig.MOVE_HUNGER_COST, 0f);
     }
 
     public void resolveEatRequests(WorldGrid world, OutcomeVector[] actionDeltas, EventBus<SimulationEvent> eventBus) {

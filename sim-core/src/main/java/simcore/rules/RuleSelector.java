@@ -68,6 +68,9 @@ public final class RuleSelector {
             case EAT -> 1f - agent.getHunger();
             case MOVE -> MathUtil.clamp01(agent.getStress());
             case IDLE -> MathUtil.clamp01(1f - agent.getStress());
+            case BROADCAST_SIGNAL -> MathUtil.clamp01(agent.getHunger()) * 0.5f
+                    + MathUtil.clamp01(agent.getStress()) * 0.1f;
+            case FOLLOW_SIGNAL -> MathUtil.clamp01(1f - agent.getHunger());
         };
     }
 }

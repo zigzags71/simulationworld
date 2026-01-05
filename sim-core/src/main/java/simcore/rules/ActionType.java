@@ -3,5 +3,7 @@ package simcore.rules;
 public enum ActionType {
     IDLE,
     MOVE,
-    EAT
+    EAT,
+    BROADCAST_SIGNAL,
+    FOLLOW_SIGNAL
 }

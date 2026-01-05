@@ -1,11 +1,14 @@
 package uiviewer.app;
 
+import javafx.animation.AnimationTimer;
 import javafx.application.Application;
+import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.control.*;
+import javafx.scene.control.ChoiceBox;
 import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.input.ScrollEvent;
@@ -20,13 +23,16 @@ import simcore.events.TelemetryBus;
 import simcore.sim.SimulationEngine;
 import simcore.sim.commands.BrushType;
 import simcore.sim.commands.PlaceFieldBrushCommand;
+import simcore.sim.commands.PlaceEmitterCommand;
 import simcore.sim.commands.SpawnAgentsCommand;
 import simcore.sim.commands.SetSelectedAgentCommand;
 import simcore.sim.commands.SetSelectedRegionCommand;
+import simcore.sim.commands.RemoveEmitterCommand;
 import simcore.snapshot.RenderSnapshot;
 import simcore.util.MathUtil;
 import uiviewer.config.UIConfig;
 import uiviewer.render.Camera;
+import uiviewer.app.SimRunner;
 import uiviewer.render.CanvasRenderer;
 import uiviewer.render.OverlayMode;
 import uiviewer.render.RenderLoop;
@@ -38,10 +44,12 @@ import uiviewer.ui.TileHoverPanel;
 import java.util.function.Consumer;
 
 public class MainApp extends Application {
-    private enum ToolMode {SELECT, FOOD, HAZARD, ERASE, AGENT}
+    private enum ToolMode {SELECT, FOOD, HAZARD, ERASE, AGENT, EMITTER}
 
     private SimulationEngine engine;
+    private SimRunner simRunner;
     private RenderLoop renderLoop;
+    private AnimationTimer performanceTimer;
     private MonitorBar monitorBar;
     private TileHoverPanel tileHoverPanel;
     private AgentInspectorPanel agentInspectorPanel;
@@ -56,6 +64,7 @@ public class MainApp extends Application {
     private int brushRadius = 1;
     private int agentSpawnCount = UIConfig.DEFAULT_AGENT_SPAWN;
     private boolean painting;
+    private boolean emitterRemoving;
     private boolean selectingRegion;
     private long lastPaintMillis;
     private Button startButton;
@@ -66,12 +75,14 @@ public class MainApp extends Application {
     private Slider waterSlider;
     private Slider agentSpawnSlider;
     private TextField seedField;
+    private ChoiceBox<Integer> speedChoice;
 
     @Override
     public void start(Stage primaryStage) {
         long seed = Long.getLong("sim.seed", SimConfig.DEFAULT_SEED);
         TelemetryBus telemetryBus = new TelemetryBus();
         engine = new SimulationEngine(MapGenConfig.defaults().withSeed(seed), telemetryBus);
+        simRunner = new SimRunner(engine, 60);
         monitorBar = new MonitorBar(telemetryBus);
         tileHoverPanel = new TileHoverPanel();
         agentInspectorPanel = new AgentInspectorPanel();
@@ -83,7 +94,6 @@ public class MainApp extends Application {
         CanvasRenderer renderer = new CanvasRenderer(canvas);
         renderLoop = new RenderLoop(engine, renderer, camera, selectionState);
         renderLoop.setAfterRender((snapshot, now) -> {
-            monitorBar.markFrameRendered(now);
             regionInspectorPanel.update(snapshot, selectionState);
             agentInspectorPanel.update(snapshot, selectionState.getSelectedAgentId());
         });
@@ -107,9 +117,29 @@ public class MainApp extends Application {
         primaryStage.setScene(scene);
         primaryStage.show();
 
-        engine.start();
-        engine.pause();
         renderLoop.start();
+        startPerformanceTimer();
+    }
+
+    private void startPerformanceTimer() {
+        performanceTimer = new AnimationTimer() {
+            private long lastSample = 0;
+
+            @Override
+            public void handle(long now) {
+                if (lastSample == 0) {
+                    lastSample = now;
+                    return;
+                }
+                if (now - lastSample >= 1_000_000_000L) {
+                    double fps = renderLoop.getLastMeasuredFps();
+                    long tps = simRunner.pollTicksPerSecond();
+                    monitorBar.updatePerformance(fps, tps);
+                    lastSample = now;
+                }
+            }
+        };
+        performanceTimer.start();
     }
 
     private VBox buildOverlayPanel() {
@@ -184,6 +214,15 @@ public class MainApp extends Application {
         pauseResumeButton = new Button("Resume");
         pauseResumeButton.setOnAction(e -> togglePause());
 
+        speedChoice = new ChoiceBox<>(FXCollections.observableArrayList(20, 40, 60, 120, 240));
+        speedChoice.setValue(60);
+        speedChoice.getSelectionModel().selectedItemProperty().addListener((obs, old, val) -> {
+            if (val != null) {
+                simRunner.setTargetTps(val);
+            }
+        });
+        HBox speedRow = new HBox(6, new Label("Sim Speed (TPS)"), speedChoice);
+
         VBox brushBox = buildBrushPanel();
 
         VBox box = new VBox(10,
@@ -195,6 +234,7 @@ public class MainApp extends Application {
                 waterControl,
                 new HBox(8, generateButton, resetButton),
                 new HBox(8, startButton, pauseResumeButton),
+                speedRow,
                 new Separator(),
                 brushBox);
         box.setPadding(new Insets(8));
@@ -210,11 +250,13 @@ public class MainApp extends Application {
         ToggleButton hazard = new ToggleButton("Hazard Brush");
         ToggleButton erase = new ToggleButton("Eraser");
         ToggleButton agent = new ToggleButton("Agent Brush");
+        ToggleButton emitter = new ToggleButton("Emitter");
         select.setToggleGroup(typeGroup);
         food.setToggleGroup(typeGroup);
         hazard.setToggleGroup(typeGroup);
         erase.setToggleGroup(typeGroup);
         agent.setToggleGroup(typeGroup);
+        emitter.setToggleGroup(typeGroup);
         select.setSelected(true);
         typeGroup.selectedToggleProperty().addListener((obs, old, val) -> {
             if (val == food) {
@@ -228,6 +270,8 @@ public class MainApp extends Application {
                 currentBrush = BrushType.ERASE;
             } else if (val == agent) {
                 currentTool = ToolMode.AGENT;
+            } else if (val == emitter) {
+                currentTool = ToolMode.EMITTER;
             } else {
                 currentTool = ToolMode.SELECT;
             }
@@ -261,7 +305,7 @@ public class MainApp extends Application {
         VBox spawnBox = new VBox(4, spawnLabel, agentSpawnSlider, spawnValue);
 
         HBox typeRow = new HBox(6, select, food, hazard);
-        HBox typeRow2 = new HBox(6, agent, erase);
+        HBox typeRow2 = new HBox(6, agent, erase, emitter);
         HBox sizeRow = new HBox(6, small, medium, large);
         typeRow.setAlignment(Pos.CENTER_LEFT);
         typeRow2.setAlignment(Pos.CENTER_LEFT);
@@ -318,6 +362,27 @@ public class MainApp extends Application {
     }
 
     private void handlePress(MouseEvent event) {
+        if (currentTool == ToolMode.EMITTER) {
+            if (event.getButton() == MouseButton.MIDDLE) {
+                panning = true;
+                lastPanX = event.getX();
+                lastPanY = event.getY();
+                return;
+            }
+            if (event.getButton() != MouseButton.PRIMARY && event.getButton() != MouseButton.SECONDARY) {
+                return;
+            }
+            RenderSnapshot snapshot = engine.getLatestSnapshot();
+            if (snapshot == null) {
+                return;
+            }
+            int[] coords = toTile(event.getX(), event.getY(), snapshot);
+            int tileX = coords[0];
+            int tileY = coords[1];
+            emitterRemoving = event.isShiftDown() || event.getButton() == MouseButton.SECONDARY;
+            startEmitterPainting(tileX, tileY);
+            return;
+        }
         if (event.getButton() == MouseButton.SECONDARY || event.getButton() == MouseButton.MIDDLE) {
             panning = true;
             lastPanX = event.getX();
@@ -359,6 +424,12 @@ public class MainApp extends Application {
         int[] coords = toTile(event.getX(), event.getY(), snapshot);
         int tileX = coords[0];
         int tileY = coords[1];
+        if (currentTool == ToolMode.EMITTER) {
+            if (painting && (event.isPrimaryButtonDown() || event.isSecondaryButtonDown())) {
+                applyEmitterIfDue(tileX, tileY);
+            }
+            return;
+        }
         if (selectingRegion && event.isPrimaryButtonDown()) {
             selectionState.updateRegionEnd(tileX, tileY);
             regionInspectorPanel.update(snapshot, selectionState);
@@ -400,6 +471,12 @@ public class MainApp extends Application {
         applyBrushIfDue(tileX, tileY);
     }
 
+    private void startEmitterPainting(int tileX, int tileY) {
+        painting = true;
+        lastPaintMillis = 0;
+        applyEmitterIfDue(tileX, tileY);
+    }
+
     private void applyBrushIfDue(int tileX, int tileY) {
         long now = System.currentTimeMillis();
         if (now - lastPaintMillis < UIConfig.BRUSH_INTERVAL_MS) {
@@ -417,6 +494,20 @@ public class MainApp extends Application {
             default -> currentBrush;
         };
         engine.queueBrushCommand(new PlaceFieldBrushCommand(type, tileX, tileY, brushRadius, System.nanoTime()));
+    }
+
+    private void applyEmitterIfDue(int tileX, int tileY) {
+        long now = System.currentTimeMillis();
+        if (now - lastPaintMillis < UIConfig.BRUSH_INTERVAL_MS) {
+            return;
+        }
+        lastPaintMillis = now;
+        if (emitterRemoving) {
+            engine.queueRemoveEmitterCommand(new RemoveEmitterCommand(tileX, tileY));
+        } else {
+            engine.queuePlaceEmitterCommand(new PlaceEmitterCommand(tileX, tileY, SimConfig.EMITTER_DEFAULT_RADIUS,
+                    SimConfig.EMITTER_DEFAULT_STRENGTH, true));
+        }
     }
 
     private void updateSelectionPanels(RenderSnapshot snapshot, int tileX, int tileY, MouseEvent event) {
@@ -510,6 +601,7 @@ public class MainApp extends Application {
     }
 
     private void regenerateFromUI() {
+        simRunner.pause();
         engine.pause();
         MapGenConfig config = MapGenConfig.defaults()
                 .withSeed(parseSeed())
@@ -539,17 +631,17 @@ public class MainApp extends Application {
     }
 
     private void startSimulation() {
-        engine.resume();
+        simRunner.start();
         startButton.setDisable(true);
         pauseResumeButton.setText("Pause");
     }
 
     private void togglePause() {
         if (pauseResumeButton.getText().equals("Pause")) {
-            engine.pause();
+            simRunner.pause();
             pauseResumeButton.setText("Resume");
         } else {
-            engine.resume();
+            simRunner.start();
             pauseResumeButton.setText("Pause");
         }
     }
@@ -566,6 +658,12 @@ public class MainApp extends Application {
     @Override
     public void stop() {
         renderLoop.stop();
+        if (performanceTimer != null) {
+            performanceTimer.stop();
+        }
+        if (simRunner != null) {
+            simRunner.stop();
+        }
         engine.stop();
     }
 

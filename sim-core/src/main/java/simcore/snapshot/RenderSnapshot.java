@@ -22,6 +22,13 @@ public class RenderSnapshot {
     private final int[] agentCultureId;
     private final int[] agentCounts;
     private final int agentCount;
+    private final int[] emitterX;
+    private final int[] emitterY;
+    private final float[] emitterStrength;
+    private final int[] emitterRadius;
+    private final boolean[] emitterEnabled;
+    private final long[] emitterId;
+    private final int emitterCount;
     private final long tickIndex;
     private final SelectedAgentDetails selectedAgentDetails;
 
@@ -29,7 +36,10 @@ public class RenderSnapshot {
                           int[] agentX, int[] agentY, int[] agentColorARGB, long[] agentId,
                           int[] agentAge, float[] agentEnergy, float[] agentHunger, float[] agentStress,
                           float[] agentPredictionError, boolean[] agentAwareness, int[] agentCultureId,
-                          int[] agentCounts, int agentCount, long tickIndex, SelectedAgentDetails selectedAgentDetails) {
+                          int[] agentCounts, int agentCount,
+                          int[] emitterX, int[] emitterY, float[] emitterStrength, int[] emitterRadius,
+                          boolean[] emitterEnabled, long[] emitterId, int emitterCount,
+                          long tickIndex, SelectedAgentDetails selectedAgentDetails) {
         this.width = width;
         this.height = height;
         this.food = food;
@@ -48,6 +58,13 @@ public class RenderSnapshot {
         this.agentCultureId = agentCultureId;
         this.agentCounts = agentCounts;
         this.agentCount = agentCount;
+        this.emitterX = emitterX;
+        this.emitterY = emitterY;
+        this.emitterStrength = emitterStrength;
+        this.emitterRadius = emitterRadius;
+        this.emitterEnabled = emitterEnabled;
+        this.emitterId = emitterId;
+        this.emitterCount = emitterCount;
         this.tickIndex = tickIndex;
         this.selectedAgentDetails = selectedAgentDetails;
     }
@@ -122,6 +139,34 @@ public class RenderSnapshot {
 
     public int getAgentCount() {
         return agentCount;
+    }
+
+    public int[] getEmitterX() {
+        return emitterX;
+    }
+
+    public int[] getEmitterY() {
+        return emitterY;
+    }
+
+    public float[] getEmitterStrength() {
+        return emitterStrength;
+    }
+
+    public int[] getEmitterRadius() {
+        return emitterRadius;
+    }
+
+    public boolean[] getEmitterEnabled() {
+        return emitterEnabled;
+    }
+
+    public long[] getEmitterId() {
+        return emitterId;
+    }
+
+    public int getEmitterCount() {
+        return emitterCount;
     }
 
     public long getTickIndex() {

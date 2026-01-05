@@ -1,7 +1,6 @@
 package uiviewer.render;
 
 import javafx.animation.AnimationTimer;
-import simcore.config.SimConfig;
 import simcore.sim.SimulationEngine;
 import simcore.snapshot.RenderSnapshot;
 import uiviewer.config.UIConfig;
@@ -15,12 +14,14 @@ public class RenderLoop extends AnimationTimer {
     private final Camera camera;
     private final SelectionState selectionState;
     private boolean showAgents = true;
-    private long lastRenderNanos = 0;
     private BiConsumer<RenderSnapshot, Long> afterRender;
     private final boolean benchmarkEnabled = UIConfig.RENDER_BENCHMARK_LOGGING;
     private long accumulatedRenderNanos = 0;
     private long accumulatedFrames = 0;
     private long lastLogNanos = 0;
+    private long frameCounter = 0;
+    private long lastFpsSample = 0;
+    private double lastMeasuredFps = 0d;
 
     public RenderLoop(SimulationEngine engine, CanvasRenderer renderer, Camera camera, SelectionState selectionState) {
         this.engine = engine;
@@ -50,24 +51,39 @@ public class RenderLoop extends AnimationTimer {
         this.afterRender = afterRender;
     }
 
+    public double getLastMeasuredFps() {
+        return lastMeasuredFps;
+    }
+
     @Override
     public void handle(long now) {
-        long frameInterval = 1_000_000_000L / SimConfig.RENDER_MAX_FPS;
-        if (now - lastRenderNanos < frameInterval) {
-            return;
-        }
         RenderSnapshot snapshot = engine.getLatestSnapshot();
         if (snapshot == null) {
             return;
         }
         long start = System.nanoTime();
         renderer.render(snapshot, overlayMode, camera, showAgents, selectionState);
-        lastRenderNanos = now;
+        frameCounter++;
         if (afterRender != null) {
             afterRender.accept(snapshot, now);
         }
         long renderDuration = System.nanoTime() - start;
         trackBenchmark(now, renderDuration);
+        sampleFps(now);
+    }
+
+    private void sampleFps(long now) {
+        if (lastFpsSample == 0) {
+            lastFpsSample = now;
+            frameCounter = 0;
+            return;
+        }
+        long elapsed = now - lastFpsSample;
+        if (elapsed >= 1_000_000_000L) {
+            lastMeasuredFps = frameCounter * 1_000_000_000.0 / elapsed;
+            frameCounter = 0;
+            lastFpsSample = now;
+        }
     }
 
     private void trackBenchmark(long now, long renderDuration) {

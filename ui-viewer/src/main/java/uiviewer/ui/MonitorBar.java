@@ -16,13 +16,13 @@ public class MonitorBar extends HBox {
     private final Label hungerLabel = new Label("Hunger: --");
     private final Label stressLabel = new Label("Stress: --");
     private final Label fpsLabel = new Label("FPS: --");
-    private long lastFrameTime = 0;
+    private final Label tpsLabel = new Label("TPS: --");
 
     public MonitorBar(TelemetryBus telemetryBus) {
         setSpacing(16);
         setPadding(new Insets(8));
         getChildren().addAll(tickLabel, populationLabel, predictionLabel, deathsLabel,
-                energyLabel, hungerLabel, stressLabel, fpsLabel);
+                energyLabel, hungerLabel, stressLabel, fpsLabel, tpsLabel);
         telemetryBus.subscribe(event -> Platform.runLater(() -> onTelemetry(event)));
     }
 
@@ -36,11 +36,8 @@ public class MonitorBar extends HBox {
         stressLabel.setText(String.format("Stress: %.3f", event.getMeanStress()));
     }
 
-    public void markFrameRendered(long nowNanos) {
-        if (lastFrameTime != 0) {
-            double fps = 1_000_000_000.0 / (nowNanos - lastFrameTime);
-            fpsLabel.setText(String.format("FPS: %.1f", fps));
-        }
-        lastFrameTime = nowNanos;
+    public void updatePerformance(double fps, long tps) {
+        fpsLabel.setText(String.format("FPS: %.1f", fps));
+        tpsLabel.setText(String.format("TPS: %d", tps));
     }
 }

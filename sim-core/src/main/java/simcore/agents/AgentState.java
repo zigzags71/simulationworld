@@ -204,22 +204,30 @@ public class AgentState {
         if (newLevel == 0) {
             if (stress > threshold1) {
                 newLevel = 1;
+            } else {
+                newLevel = 0;
             }
         } else if (newLevel == 1) {
             if (stress > threshold2) {
                 newLevel = 2;
             } else if (stress < (threshold1 - hysteresis)) {
                 newLevel = 0;
+            } else {
+                newLevel = 1;
             }
         } else if (newLevel == 2) {
             if (stress > threshold3) {
                 newLevel = 3;
             } else if (stress < (threshold2 - hysteresis)) {
                 newLevel = 1;
+            } else {
+                newLevel = 2;
             }
         } else if (newLevel == 3) {
             if (stress < (threshold3 - hysteresis)) {
                 newLevel = 2;
+            } else {
+                newLevel = 3;
             }
         }
         setAwarenessLevel(newLevel);

@@ -15,6 +15,8 @@ import javafx.scene.input.ScrollEvent;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.Orientation;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 import simcore.config.MapGenConfig;
@@ -90,7 +92,7 @@ public class MainApp extends Application {
         camera = new Camera(SimConfig.WORLD_W, SimConfig.WORLD_H);
         selectionState = new SelectionState();
 
-        Canvas canvas = new Canvas(1024, 768);
+        Canvas canvas = new Canvas();
         CanvasRenderer renderer = new CanvasRenderer(canvas);
         renderLoop = new RenderLoop(engine, renderer, camera, selectionState);
         renderLoop.setAfterRender((snapshot, now) -> {
@@ -100,15 +102,22 @@ public class MainApp extends Application {
 
         VBox leftPanel = buildOverlayPanel();
         VBox controlPanel = buildControlPanel();
-        VBox rightPanel = buildInspectorPanel();
+        TabPane inspectorTabs = buildInspectorTabs();
+
+        StackPane simContainer = new StackPane(canvas);
+        canvas.widthProperty().bind(simContainer.widthProperty());
+        canvas.heightProperty().bind(simContainer.heightProperty());
+
+        SplitPane verticalSplit = new SplitPane(simContainer, inspectorTabs);
+        verticalSplit.setOrientation(Orientation.VERTICAL);
+        verticalSplit.setDividerPositions(0.75);
 
         BorderPane root = new BorderPane();
         root.setTop(monitorBar);
         VBox left = new VBox(leftPanel, controlPanel);
         VBox.setVgrow(controlPanel, Priority.ALWAYS);
         root.setLeft(left);
-        root.setCenter(canvas);
-        root.setRight(rightPanel);
+        root.setCenter(verticalSplit);
 
         attachInteractionHandlers(canvas);
 
@@ -172,9 +181,7 @@ public class MainApp extends Application {
         return box;
     }
 
-    private VBox buildInspectorPanel() {
-        VBox box = new VBox(12);
-        box.setPadding(new Insets(8));
+    private TabPane buildInspectorTabs() {
         regionInspectorPanel.setOnClearSelection(() -> {
             selectionState.clearRegion();
             selectionState.clearTile();
@@ -186,11 +193,19 @@ public class MainApp extends Application {
             regionInspectorPanel.clear();
         });
         regionInspectorPanel.setOnAgentSelected(this::selectAgentFromRegionList);
-        box.getChildren().addAll(tileHoverPanel, agentInspectorPanel, regionInspectorPanel);
-        VBox.setVgrow(agentInspectorPanel, Priority.ALWAYS);
-        VBox.setVgrow(regionInspectorPanel, Priority.ALWAYS);
-        agentInspectorPanel.setPrefHeight(300);
-        return box;
+
+        Tab hoverTab = new Tab("Hover", tileHoverPanel);
+        Tab agentTab = new Tab("Agent", agentInspectorPanel);
+        Tab regionTab = new Tab("Region", regionInspectorPanel);
+        hoverTab.setClosable(false);
+        agentTab.setClosable(false);
+        regionTab.setClosable(false);
+
+        TabPane tabPane = new TabPane(hoverTab, agentTab, regionTab);
+        tabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
+        tabPane.setPrefHeight(300);
+        VBox.setVgrow(tabPane, Priority.ALWAYS);
+        return tabPane;
     }
 
     private VBox buildControlPanel() {

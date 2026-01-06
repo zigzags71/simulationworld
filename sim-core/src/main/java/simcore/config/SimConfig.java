@@ -69,6 +69,8 @@ public final class SimConfig {
 
     public static final float IDLE_STRESS_RECOVERY_BONUS = 0.0002f;
 
+    public static final int CROWDING_RADIUS = 6;
+    public static final float CROWDING_FOOD_WEIGHT = 0.35f;
     public static final float CROWDING_MAX_EXPECTED = 6f;
 
     public static final int STRESS_NEIGHBOR_RADIUS = 8;

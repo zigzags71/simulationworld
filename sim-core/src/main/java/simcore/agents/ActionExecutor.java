@@ -13,6 +13,7 @@ import simcore.world.objects.FoodEmitter;
 import simcore.world.signals.Signal;
 import simcore.world.signals.SignalField;
 
+import java.util.Arrays;
 import java.util.Random;
 
 public class ActionExecutor {
@@ -21,13 +22,26 @@ public class ActionExecutor {
     private final TileRequestIndex tileRequestIndex = new TileRequestIndex();
     private final RequestOrderBuffer requestOrder = new RequestOrderBuffer();
     private AgentTickMetrics metrics;
+    private float[] claimedFood;
+    private int claimedFoodTileCount = -1;
 
     public ActionExecutor(Random random) {
         this.random = random;
     }
 
+    public void prepareWorld(WorldGrid world) {
+        int tileCount = world.getWidth() * world.getHeight();
+        if (claimedFood == null || claimedFood.length != tileCount) {
+            claimedFood = new float[tileCount];
+        }
+        claimedFoodTileCount = tileCount;
+    }
+
     public void beginTick(int expectedAgents) {
         eatRequests.reset(expectedAgents);
+        if (claimedFood != null) {
+            Arrays.fill(claimedFood, 0f);
+        }
     }
 
     public void setMetrics(AgentTickMetrics metrics) {
@@ -56,8 +70,12 @@ public class ActionExecutor {
         float[] food = world.getFoodField();
         float[] hazard = world.getHazardField();
         boolean[] water = world.getWaterMask();
+        float localCrowding = computeLocalFoodCrowding(world, agent.getX(), agent.getY(), SimConfig.CROWDING_RADIUS);
+        float foodWeightScale = Math.max(0f, 1f - localCrowding * SimConfig.CROWDING_FOOD_WEIGHT);
         int currentIdx = MathUtil.index(agent.getX(), agent.getY(), width);
-        float currentScore = food[currentIdx] * SimConfig.MOVE_FOOD_WEIGHT - hazard[currentIdx] * SimConfig.MOVE_HAZARD_WEIGHT;
+        float currentFood = Math.max(0f, food[currentIdx] - claimedFood[currentIdx]);
+        float currentScore = currentFood * SimConfig.MOVE_FOOD_WEIGHT * foodWeightScale
+                - hazard[currentIdx] * SimConfig.MOVE_HAZARD_WEIGHT;
         float bestNeighborScore = Float.NEGATIVE_INFINITY;
         float bestTieBreaker = -1f;
         for (int dy = -1; dy <= 1; dy++) {
@@ -71,7 +89,9 @@ public class ActionExecutor {
                 if (water[idx]) {
                     continue;
                 }
-                float score = food[idx] * SimConfig.MOVE_FOOD_WEIGHT - hazard[idx] * SimConfig.MOVE_HAZARD_WEIGHT;
+                float avail = Math.max(0f, food[idx] - claimedFood[idx]);
+                float score = avail * SimConfig.MOVE_FOOD_WEIGHT * foodWeightScale
+                        - hazard[idx] * SimConfig.MOVE_HAZARD_WEIGHT;
                 float tieBreaker = random.nextFloat() * 0.0001f;
                 if (score > bestNeighborScore
                         || (Math.abs(score - bestNeighborScore) < 1e-6f && tieBreaker > bestTieBreaker)) {
@@ -87,6 +107,41 @@ public class ActionExecutor {
         }
         agent.moveTo(bestX, bestY);
         return new OutcomeVector(-SimConfig.MOVE_ENERGY_COST, -SimConfig.MOVE_HUNGER_COST, 0f);
+    }
+
+    public float computeLocalFoodCrowding(WorldGrid world, int ax, int ay, int radius) {
+        float[] food = world.getFoodField();
+        int w = world.getWidth();
+        int h = world.getHeight();
+        int relevant = 0;
+        int fullyClaimed = 0;
+        if (claimedFood == null || claimedFood.length != w * h) {
+            return 0f;
+        }
+        for (int y = ay - radius; y <= ay + radius; y++) {
+            if (y < 0 || y >= h) {
+                continue;
+            }
+            for (int x = ax - radius; x <= ax + radius; x++) {
+                if (x < 0 || x >= w) {
+                    continue;
+                }
+                int idx = y * w + x;
+                float f = food[idx];
+                if (f <= SimConfig.FOOD_MIN_TO_EAT) {
+                    continue;
+                }
+                relevant++;
+                float unclaimed = Math.max(0f, f - claimedFood[idx]);
+                if (unclaimed <= SimConfig.FOOD_MIN_TO_EAT) {
+                    fullyClaimed++;
+                }
+            }
+        }
+        if (relevant == 0) {
+            return 0f;
+        }
+        return fullyClaimed / (float) relevant;
     }
 
     private OutcomeVector exploratoryMove(AgentState agent, WorldGrid world) {
@@ -159,7 +214,15 @@ public class ActionExecutor {
 
     private OutcomeVector eat(AgentState agent, WorldGrid world, int agentSlot, long tickIndex) {
         int idx = MathUtil.index(agent.getX(), agent.getY(), world.getWidth());
-        eatRequests.add(idx, agent.getId().value(), agentSlot, SimConfig.FOOD_CONSUME_RATE, tickIndex, agent.getEnergy());
+        float[] food = world.getFoodField();
+        float remaining = Math.max(0f, food[idx] - claimedFood[idx]);
+        if (remaining < SimConfig.FOOD_MIN_TO_EAT) {
+            return OutcomeVector.zero();
+        }
+        float desired = SimConfig.FOOD_CONSUME_RATE;
+        float claim = Math.min(desired, remaining);
+        claimedFood[idx] += claim;
+        eatRequests.add(idx, agent.getId().value(), agentSlot, claim, tickIndex, agent.getEnergy());
         return OutcomeVector.zero();
     }
 

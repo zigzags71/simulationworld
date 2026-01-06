@@ -24,13 +24,14 @@ public class AgentInspectorPanel extends VBox {
     private final Label socialCreditLabel = new Label("Social: --");
     private final Label awarenessLabel = new Label("Awareness: --");
     private final Label cultureLabel = new Label("Culture: --");
+    private final Label crowdingLabel = new Label("Crowding: --");
     private final ListView<String> rulesList = new ListView<>();
 
     public AgentInspectorPanel() {
         setSpacing(4);
         rulesList.setPlaceholder(new Label("No rules"));
         getChildren().addAll(idLabel, nameLabel, positionLabel, ageLabel, energyLabel, hungerLabel, stressLabel,
-                predictionErrorLabel, socialCreditLabel, awarenessLabel, cultureLabel, new Label("Rules"), rulesList);
+                predictionErrorLabel, socialCreditLabel, awarenessLabel, cultureLabel, crowdingLabel, new Label("Rules"), rulesList);
     }
 
     public void clear() {
@@ -45,6 +46,7 @@ public class AgentInspectorPanel extends VBox {
         socialCreditLabel.setText("Social: --");
         awarenessLabel.setText("Awareness: --");
         cultureLabel.setText("Culture: --");
+        crowdingLabel.setText("Crowding: --");
         rulesList.getItems().clear();
     }
 
@@ -70,6 +72,7 @@ public class AgentInspectorPanel extends VBox {
         nameLabel.setText("Name: " + NameRegistry.resolveFirstName(details.getFirstNameId()) + " "
                 + NameRegistry.resolveSurname(details.getSurnameId()));
         cultureLabel.setText("Culture: " + CultureNameRegistry.resolveCultureName(details.getCultureId()));
+        crowdingLabel.setText(String.format("Crowding: %.3f", details.getLocalFoodCrowding()));
         rulesList.getItems().setAll(renderRules(details.getRules()));
     }
 

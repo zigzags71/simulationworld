@@ -471,9 +471,10 @@ public class SimulationEngine {
             views[i] = new RuleView(rule.getRuleId(), rule.getType(), rule.getContextKey().toString(), rule.getAction(),
                     rule.getTrust(), rule.getUses(), rule.getSuccesses(), rule.getLastUsedTick(), rule.getLastError());
         }
+        float crowd = actionExecutor.computeLocalFoodCrowding(world, agent.getX(), agent.getY(), SimConfig.CROWDING_RADIUS);
         return new SelectedAgentDetails(agent.getId().value(), agent.getX(), agent.getY(), agent.getAgeTicks(), agent.getEnergy(), agent.getHunger(),
                 agent.getStress(), agent.getPredictionError(), agent.getSocialCredit(), agent.isAwarenessFlag(), agent.getFirstNameId(),
-                agent.getSurnameId(), agent.getCultureId(), views);
+                agent.getSurnameId(), agent.getCultureId(), crowd, views);
     }
 
     private void initializeRecorder(MapGenConfig mapGenConfig) {

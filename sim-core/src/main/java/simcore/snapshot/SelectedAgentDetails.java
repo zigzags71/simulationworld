@@ -14,10 +14,12 @@ public class SelectedAgentDetails {
     private final int firstNameId;
     private final int surnameId;
     private final int cultureId;
+    private final float localFoodCrowding;
     private final RuleView[] rules;
 
     public SelectedAgentDetails(long agentId, int x, int y, int ageTicks, float energy, float hunger, float stress, float predictionError,
-                                float socialCredit, boolean awareness, int firstNameId, int surnameId, int cultureId, RuleView[] rules) {
+                                float socialCredit, boolean awareness, int firstNameId, int surnameId, int cultureId,
+                                float localFoodCrowding, RuleView[] rules) {
         this.agentId = agentId;
         this.x = x;
         this.y = y;
@@ -31,6 +33,7 @@ public class SelectedAgentDetails {
         this.firstNameId = firstNameId;
         this.surnameId = surnameId;
         this.cultureId = cultureId;
+        this.localFoodCrowding = localFoodCrowding;
         this.rules = rules;
     }
 
@@ -84,6 +87,10 @@ public class SelectedAgentDetails {
 
     public int getCultureId() {
         return cultureId;
+    }
+
+    public float getLocalFoodCrowding() {
+        return localFoodCrowding;
     }
 
     public RuleView[] getRules() {

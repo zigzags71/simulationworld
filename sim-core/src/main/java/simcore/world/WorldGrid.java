@@ -8,6 +8,7 @@ import simcore.world.signals.SignalField;
 import simcore.world.spawners.EmitterSpawner;
 import simcore.world.spawners.SpawnerType;
 
+import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -53,8 +54,10 @@ public class WorldGrid {
         float[] hazard = new float[food.length];
         boolean[] water = new boolean[food.length];
 
+        boolean hazardDisabled = config.getHazardBaseline() <= 0f;
+
         float foodBase = 0.25f + config.getFoodRichness() * 0.75f;
-        float hazardBase = 0.2f + config.getHazardBaseline() * 0.6f;
+        float hazardBase = hazardDisabled ? 0f : 0.2f + config.getHazardBaseline() * 0.6f;
         float noiseScale = 0.35f + config.getPatchiness() * 0.65f;
         float waterThreshold = 0.05f + config.getWaterRatio() * 0.45f;
 
@@ -64,14 +67,17 @@ public class WorldGrid {
                 float fx = (float) x / width;
                 float fy = (float) y / height;
                 float foodNoise = layeredNoise(random, fx, fy, config.getPatchiness());
-                float hazardNoise = layeredNoise(random, fy, fx, 1f - config.getPatchiness());
+                float hazardNoise = hazardDisabled ? 0f : layeredNoise(random, fy, fx, 1f - config.getPatchiness());
                 food[idx] = MathUtil.clamp01(foodBase + foodNoise * noiseScale);
-                hazard[idx] = MathUtil.clamp01(hazardBase + hazardNoise * noiseScale);
+                hazard[idx] = hazardDisabled ? 0f : MathUtil.clamp01(hazardBase + hazardNoise * noiseScale);
                 water[idx] = (food[idx] + hazard[idx]) < waterThreshold;
             }
         }
 
         smooth(water, food, hazard, width, height, config.getWaterRatio());
+        if (hazardDisabled) {
+            Arrays.fill(hazard, 0f);
+        }
         clampFood(food);
         WorldGrid world = new WorldGrid(width, height, config.getSeed(), food, hazard, water);
         if (SimConfig.DEFAULT_SPAWNERS_ENABLED) {

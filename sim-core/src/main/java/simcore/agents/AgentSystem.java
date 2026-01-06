@@ -74,6 +74,7 @@ public class AgentSystem {
         int[] crowding = computeCrowding(width, world.getHeight());
         int agentCount = agents.size();
         ensureBuffers(agentCount);
+        actionExecutor.prepareWorld(world);
         actionExecutor.beginTick(agentCount);
         actionExecutor.setMetrics(metrics);
         for (int i = 0; i < agentCount; i++) {

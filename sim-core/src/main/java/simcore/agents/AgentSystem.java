@@ -138,23 +138,7 @@ public class AgentSystem {
             }
             OutcomeVector before = beforeStates[i];
             OutcomeVector actionDelta = actionDeltas[i] != null ? actionDeltas[i] : OutcomeVector.zero();
-            if (actionDelta.getDeltaHunger() > 0f || actionDelta.getDeltaEnergy() > 0f) {
-                agent.setLastSuccessfulEatTick(tickIndex);
-                if (agent.getLastFollowOriginAgentId() != -1 && agent.getLastFollowOriginAgentId() != agent.getId().value()) {
-                    long followAge = tickIndex - agent.getLastFollowTick();
-                    if (followAge <= SimConfig.SOCIAL_CREDIT_REWARD_WINDOW_TICKS) {
-                        AgentState broadcaster = findAgentById(agent.getLastFollowOriginAgentId());
-                        if (broadcaster != null && !broadcaster.isDead()) {
-                            float reward = MathUtil.clamp01(
-                                    SimConfig.SOCIAL_CREDIT_REWARD_PER_ENERGY_GAIN * actionDelta.getDeltaEnergy());
-                            if (reward > 0f) {
-                                broadcaster.addSocialCredit(reward);
-                            }
-                        }
-                        agent.clearFollowMemory();
-                    }
-                }
-            }
+            rewardLeaderForFollow(agent, actionDelta, tickIndex);
             OutcomeVector totalDelta = baseDeltas[i].add(actionDelta);
             agent.applyTick(totalDelta.getDeltaEnergy(), totalDelta.getDeltaHunger(), totalDelta.getDeltaStress());
             personalStressBuffer[i] = agent.getStress();
@@ -211,6 +195,26 @@ public class AgentSystem {
             skipBuffer = new boolean[count];
             personalStressBuffer = new float[count];
             neighborStressBuffer = new float[count];
+        }
+    }
+
+    public void rewardLeaderForFollow(AgentState agent, OutcomeVector actionDelta, long tickIndex) {
+        if (actionDelta.getDeltaHunger() > 0f || actionDelta.getDeltaEnergy() > 0f) {
+            agent.setLastSuccessfulEatTick(tickIndex);
+            if (agent.getLastFollowOriginAgentId() != -1 && agent.getLastFollowOriginAgentId() != agent.getId().value()) {
+                long followAge = tickIndex - agent.getLastFollowTick();
+                if (followAge <= SimConfig.SOCIAL_CREDIT_REWARD_WINDOW_TICKS) {
+                    AgentState broadcaster = findAgentById(agent.getLastFollowOriginAgentId());
+                    if (broadcaster != null && !broadcaster.isDead()) {
+                        float reward = MathUtil.clamp01(
+                                SimConfig.SOCIAL_CREDIT_REWARD_PER_ENERGY_GAIN * actionDelta.getDeltaEnergy());
+                        if (reward > 0f) {
+                            broadcaster.addSocialCredit(reward);
+                        }
+                    }
+                    agent.clearFollowMemory();
+                }
+            }
         }
     }
 

@@ -70,8 +70,12 @@ public class SimRunner {
         if (scheduledTask != null) {
             scheduledTask.cancel(false);
         }
-        long periodNanos = 1_000_000_000L / targetTps;
-        scheduledTask = executor.scheduleAtFixedRate(this::stepSafely, 0, periodNanos, TimeUnit.NANOSECONDS);
+        if (targetTps > 1000) {
+            scheduledTask = executor.scheduleAtFixedRate(this::stepBurstSafely, 0, 1, TimeUnit.MILLISECONDS);
+        } else {
+            long periodNanos = 1_000_000_000L / targetTps;
+            scheduledTask = executor.scheduleAtFixedRate(this::stepSafely, 0, periodNanos, TimeUnit.NANOSECONDS);
+        }
     }
 
     private void stepSafely() {
@@ -86,5 +90,18 @@ public class SimRunner {
         lastTickStartNanos = now;
         engine.step();
         tickCounter.incrementAndGet();
+    }
+
+    private void stepBurstSafely() {
+        long now = System.nanoTime();
+        long stepsPerCall = Math.max(1, targetTps / 1000);
+        if (lastTickStartNanos != 0 && now - lastTickStartNanos > 2_000_000L) {
+            lastTickStartNanos = now;
+        }
+        lastTickStartNanos = now;
+        for (int i = 0; i < stepsPerCall; i++) {
+            engine.step();
+        }
+        tickCounter.addAndGet(stepsPerCall);
     }
 }

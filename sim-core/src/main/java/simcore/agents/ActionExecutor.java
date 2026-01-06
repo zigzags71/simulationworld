@@ -175,9 +175,14 @@ public class ActionExecutor {
         boolean signalCreated = false;
         if ((ateRecently || nearbyEmitter != null) && cooldownReady && nearbyEmitter != null) {
             if (localFood >= SimConfig.FOOD_MIN_TO_EAT || nearbyEmitter != null) {
+                if (!nearbyEmitter.hasLeader()) {
+                    nearbyEmitter.setLeaderAgentId(agent.getId().value());
+                }
+                long remaining = nearbyEmitter.getExpiresAtTick() - tickIndex;
+                int ttl = (int) Math.max(1, Math.min(Integer.MAX_VALUE, remaining));
                 int strengthBucket = BinningUtil.bin01(localFood, SimConfig.SIGNAL_STRENGTH_BINS);
                 Signal signal = world.getSignalField().addSignal(agent.getX(), agent.getY(), strengthBucket, SimConfig.SIGNAL_BASE_CONFIDENCE,
-                        SimConfig.SIGNAL_TTL_TICKS, 0, agent.getId().value(), agent.getSocialCredit(), nearbyEmitter.getId(), tickIndex);
+                        ttl, 0, agent.getId().value(), nearbyEmitter.getLeaderAgentId(), agent.getSocialCredit(), nearbyEmitter.getId(), tickIndex);
                 if (signal != null) {
                     agent.setLastBroadcastTick(tickIndex);
                     if (metrics != null) {
@@ -213,7 +218,7 @@ public class ActionExecutor {
             return exploratoryMove(agent, world);
         }
         agent.setFollowLock(best.getX(), best.getY(), tickIndex + SimConfig.PATTERN_FOLLOW_LOCK_TICKS);
-        agent.setFollowMemory(best.getId(), -1, best.getOriginAgentId(), tickIndex);
+        agent.setFollowMemory(best.getId(), -1, best.getLeaderAgentId(), tickIndex);
         if (metrics != null) {
             metrics.incrementFollowMoves();
         }

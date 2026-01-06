@@ -20,8 +20,8 @@ public class FoodEmitterDeterminismTest {
         assertEquals(emitterA.getRadius(), emitterB.getRadius());
 
         for (int i = 0; i < 20; i++) {
-            worldA.tickEmitters();
-            worldB.tickEmitters();
+            worldA.tickEmitters(i);
+            worldB.tickEmitters(i);
         }
 
         float[] aFood = worldA.getFoodField();

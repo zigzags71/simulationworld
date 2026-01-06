@@ -93,6 +93,15 @@ public final class SimConfig {
     public static final int SIGNAL_BROADCAST_COOLDOWN_TICKS = 50;
     public static final int SIGNAL_MAX_ACTIVE = 5_000;
 
+    public static boolean DEFAULT_SPAWNERS_ENABLED = true;
+    public static int DEFAULT_SPAWNER_COUNT_MIN = 4;
+    public static int DEFAULT_SPAWNER_COUNT_MAX = 12;
+    public static int SPAWNER_AREA_RADIUS = 18;
+    public static long FOOD_EMITTER_TTL_TICKS = 8_000;
+    public static long SPAWNER_RESPAWN_COOLDOWN_TICKS = 400;
+    public static int FOOD_EMITTER_RADIUS = 6;
+    public static float FOOD_EMITTER_STRENGTH = 0.02f;
+
     public static final int SOCIAL_CREDIT_REWARD_WINDOW_TICKS = 60;
     public static final float SOCIAL_CREDIT_REWARD_PER_ENERGY_GAIN = 0.2f;
 

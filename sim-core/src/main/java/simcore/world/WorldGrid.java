@@ -5,6 +5,8 @@ import simcore.config.SimConfig;
 import simcore.util.MathUtil;
 import simcore.world.objects.FoodEmitter;
 import simcore.world.signals.SignalField;
+import simcore.world.spawners.EmitterSpawner;
+import simcore.world.spawners.SpawnerType;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -21,6 +23,7 @@ public class WorldGrid {
     private final float[] hazardField;
     private final boolean[] waterMask;
     private final List<FoodEmitter> emitters;
+    private final List<EmitterSpawner> spawners;
     private long nextEmitterId = 1;
     private final SignalField signalField;
 
@@ -34,6 +37,7 @@ public class WorldGrid {
         this.hazardField = hazardField;
         this.waterMask = waterMask;
         this.emitters = new ArrayList<>();
+        this.spawners = new ArrayList<>();
         this.signalField = new SignalField(width, height);
     }
 
@@ -69,7 +73,11 @@ public class WorldGrid {
 
         smooth(water, food, hazard, width, height, config.getWaterRatio());
         clampFood(food);
-        return new WorldGrid(width, height, config.getSeed(), food, hazard, water);
+        WorldGrid world = new WorldGrid(width, height, config.getSeed(), food, hazard, water);
+        if (SimConfig.DEFAULT_SPAWNERS_ENABLED) {
+            world.addDefaultSpawners(random);
+        }
+        return world;
     }
 
     private static void clampFood(float[] food) {
@@ -174,11 +182,28 @@ public class WorldGrid {
         return Collections.unmodifiableList(emitters);
     }
 
+    public List<EmitterSpawner> getSpawnersView() {
+        return Collections.unmodifiableList(spawners);
+    }
+
     public FoodEmitter addEmitter(int x, int y, int radius, float strength, boolean enabled) {
         FoodEmitter emitter = new FoodEmitter(nextEmitterId++, x, y, radius, strength, enabled);
         emitters.add(emitter);
         emitters.sort((a, b) -> Long.compare(a.getId(), b.getId()));
         return emitter;
+    }
+
+    public FoodEmitter findEmitterById(long id) {
+        for (FoodEmitter emitter : emitters) {
+            if (emitter.getId() == id) {
+                return emitter;
+            }
+        }
+        return null;
+    }
+
+    public boolean removeEmitterById(long id) {
+        return emitters.removeIf(e -> e.getId() == id);
     }
 
     public int findBestFoodTileIndexWithin(int x, int y, int radius) {
@@ -258,13 +283,18 @@ public class WorldGrid {
         }
     }
 
-    public void tickEmitters() {
+    public void tickEmitters(long tick) {
+        for (EmitterSpawner spawner : spawners) {
+            spawner.tick(tick, this);
+        }
+        emitters.removeIf(emitter -> emitter.isExpired(tick));
         for (FoodEmitter emitter : emitters) {
-            if (!emitter.isEnabled()) {
+            if (!emitter.isEnabled() || emitter.isExpired(tick)) {
                 continue;
             }
             depositEmitter(emitter);
         }
+        emitters.removeIf(emitter -> emitter.isExpired(tick));
     }
 
     private void depositEmitter(FoodEmitter emitter) {
@@ -303,6 +333,35 @@ public class WorldGrid {
                 float next = Math.min(SimConfig.TILE_FOOD_MAX, foodStock[idx] + add);
                 foodStock[idx] = next;
             }
+        }
+    }
+
+    private void addDefaultSpawners(Random random) {
+        int desired = SimConfig.DEFAULT_SPAWNER_COUNT_MIN;
+        if (SimConfig.DEFAULT_SPAWNER_COUNT_MAX > SimConfig.DEFAULT_SPAWNER_COUNT_MIN) {
+            desired += random.nextInt(SimConfig.DEFAULT_SPAWNER_COUNT_MAX - SimConfig.DEFAULT_SPAWNER_COUNT_MIN + 1);
+        }
+        int attempts = 0;
+        while (spawners.size() < desired && attempts < desired * 200) {
+            attempts++;
+            int x = random.nextInt(width);
+            int y = random.nextInt(height);
+            if (waterMask[index(x, y, width)]) {
+                continue;
+            }
+            boolean farEnough = true;
+            for (EmitterSpawner spawner : spawners) {
+                int dx = spawner.getCenterX() - x;
+                int dy = spawner.getCenterY() - y;
+                if (dx * dx + dy * dy < SimConfig.SPAWNER_AREA_RADIUS * SimConfig.SPAWNER_AREA_RADIUS) {
+                    farEnough = false;
+                    break;
+                }
+            }
+            if (!farEnough) {
+                continue;
+            }
+            spawners.add(new EmitterSpawner(spawners.size() + 1, x, y, SimConfig.SPAWNER_AREA_RADIUS, SpawnerType.FOOD));
         }
     }
 }

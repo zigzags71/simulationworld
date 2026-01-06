@@ -83,6 +83,7 @@ public class MainApp extends Application {
     private Slider agentSpawnSlider;
     private TextField seedField;
     private ChoiceBox<Integer> speedChoice;
+    private CheckBox defaultSpawnerToggle;
 
     @Override
     public void start(Stage primaryStage) {
@@ -266,7 +267,7 @@ public class MainApp extends Application {
         pauseResumeButton = new Button("Resume");
         pauseResumeButton.setOnAction(e -> togglePause());
 
-        speedChoice = new ChoiceBox<>(FXCollections.observableArrayList(20, 40, 60, 120, 240));
+        speedChoice = new ChoiceBox<>(FXCollections.observableArrayList(20, 40, 60, 120, 240, 480, 960, 2000, 5000, 20000));
         speedChoice.setValue(60);
         speedChoice.getSelectionModel().selectedItemProperty().addListener((obs, old, val) -> {
             if (val != null) {
@@ -274,6 +275,11 @@ public class MainApp extends Application {
             }
         });
         HBox speedRow = new HBox(6, new Label("Sim Speed (TPS)"), speedChoice);
+
+        defaultSpawnerToggle = new CheckBox("Default Spawners");
+        defaultSpawnerToggle.setSelected(SimConfig.DEFAULT_SPAWNERS_ENABLED);
+        defaultSpawnerToggle.selectedProperty().addListener((obs, old, val) -> SimConfig.DEFAULT_SPAWNERS_ENABLED = val);
+        HBox spawnerRow = new HBox(6, defaultSpawnerToggle);
 
         VBox brushBox = buildBrushPanel();
 
@@ -287,6 +293,7 @@ public class MainApp extends Application {
                 new HBox(8, generateButton, resetButton),
                 new HBox(8, startButton, pauseResumeButton),
                 speedRow,
+                spawnerRow,
                 new Separator(),
                 brushBox);
         box.setPadding(new Insets(8));
@@ -735,6 +742,8 @@ public class MainApp extends Application {
         hazardSlider.setValue(SimConfig.DEFAULT_HAZARD_BASELINE);
         patchinessSlider.setValue(SimConfig.DEFAULT_PATCHINESS);
         waterSlider.setValue(SimConfig.DEFAULT_WATER_RATIO);
+        SimConfig.DEFAULT_SPAWNERS_ENABLED = true;
+        defaultSpawnerToggle.setSelected(true);
         regenerateFromUI();
     }
 

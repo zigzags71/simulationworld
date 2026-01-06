@@ -210,6 +210,7 @@ public class SnapshotRecorder implements AutoCloseable {
                     .append("\"hunger\":").append(formatFloat(agent.getHunger())).append(',')
                     .append("\"stress\":").append(formatFloat(agent.getStress())).append(',')
                     .append("\"predictionError\":").append(formatFloat(agent.getPredictionError())).append(',')
+                    .append("\"socialCredit\":").append(formatFloat(agent.getSocialCredit())).append(',')
                     .append("\"rules\":[");
             RuleView[] rules = agent.getRules();
             for (int i = 0; i < rules.length; i++) {

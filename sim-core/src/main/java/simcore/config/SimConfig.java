@@ -96,11 +96,11 @@ public final class SimConfig {
     public static final int SOCIAL_CREDIT_REWARD_WINDOW_TICKS = 60;
     public static final float SOCIAL_CREDIT_REWARD_PER_ENERGY_GAIN = 0.2f;
 
-    public static boolean LOG_EVENTS_ENABLED = false;
+    public static boolean LOG_EVENTS_ENABLED = true;
     public static boolean LOG_SELECTED_AGENT_ENABLED = false;
     public static boolean LOG_SELECTED_REGION_ENABLED = false;
     public static int LOG_THROTTLE_TICKS = 20;
-    public static boolean FILE_LOG_ENABLED = false;
+    public static boolean FILE_LOG_ENABLED = true;
     public static String LOG_DIR = "./logs";
     public static int SUMMARY_INTERVAL_TICKS = 20;
     public static int SELECTION_INTERVAL_TICKS = 20;

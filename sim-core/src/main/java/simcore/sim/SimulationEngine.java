@@ -31,6 +31,8 @@ import simcore.util.MathUtil;
 import simcore.world.WorldGrid;
 import simcore.world.objects.FoodEmitter;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
@@ -468,8 +470,8 @@ public class SimulationEngine {
                     rule.getTrust(), rule.getUses(), rule.getSuccesses(), rule.getLastUsedTick(), rule.getLastError());
         }
         return new SelectedAgentDetails(agent.getId().value(), agent.getX(), agent.getY(), agent.getAgeTicks(), agent.getEnergy(), agent.getHunger(),
-                agent.getStress(), agent.getPredictionError(), agent.isAwarenessFlag(), agent.getFirstNameId(), agent.getSurnameId(),
-                agent.getCultureId(), views);
+                agent.getStress(), agent.getPredictionError(), agent.getSocialCredit(), agent.isAwarenessFlag(), agent.getFirstNameId(),
+                agent.getSurnameId(), agent.getCultureId(), views);
     }
 
     private void initializeRecorder(MapGenConfig mapGenConfig) {
@@ -481,6 +483,7 @@ public class SimulationEngine {
             return;
         }
         try {
+            Files.createDirectories(Path.of(SimConfig.LOG_DIR));
             snapshotRecorder = new SnapshotRecorder(telemetryBus, this::getLastRegionSnapshot, snapshotBuffer::getLatest, mapGenConfig,
                     mapGenConfig.getSeed());
         } catch (Exception e) {

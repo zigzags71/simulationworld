@@ -45,8 +45,11 @@ import uiviewer.ui.MonitorBar;
 import uiviewer.ui.RegionInspectorPanel;
 import uiviewer.ui.TileHoverPanel;
 import java.util.function.Consumer;
+import java.util.ArrayList;
+import java.util.List;
 
 public class MainApp extends Application {
+    private static final int AGENT_NAV_CAP = 2000;
     private enum ToolMode {SELECT, FOOD, HAZARD, ERASE, AGENT, EMITTER}
 
     private SimulationEngine engine;
@@ -59,6 +62,7 @@ public class MainApp extends Application {
     private RegionInspectorPanel regionInspectorPanel;
     private Camera camera;
     private SelectionState selectionState;
+    private final List<Long> lastSelectableAgentIds = new ArrayList<>();
     private boolean panning;
     private double lastPanX;
     private double lastPanY;
@@ -99,6 +103,7 @@ public class MainApp extends Application {
         renderLoop.setAfterRender((snapshot, now) -> {
             regionInspectorPanel.update(snapshot, selectionState);
             agentInspectorPanel.update(snapshot, selectionState.getSelectedAgentId());
+            recomputeSelectableAgents(snapshot);
         });
 
         VBox leftPanel = buildOverlayPanel();
@@ -211,7 +216,16 @@ public class MainApp extends Application {
         regionInspectorPanel.setOnAgentSelected(this::selectAgentFromRegionList);
 
         Tab hoverTab = new Tab("Hover", wrapInspectorContent(tileHoverPanel));
-        Tab agentTab = new Tab("Agent", wrapInspectorContent(agentInspectorPanel));
+        Button prevAgentButton = new Button("<-");
+        Button nextAgentButton = new Button("->");
+        prevAgentButton.setOnAction(e -> navigateAgent(-1));
+        nextAgentButton.setOnAction(e -> navigateAgent(1));
+        HBox agentNavBar = new HBox(8, prevAgentButton, nextAgentButton);
+        agentNavBar.setAlignment(Pos.CENTER_LEFT);
+        ScrollPane agentPane = wrapInspectorContent(agentInspectorPanel);
+        VBox agentContent = new VBox(8, agentNavBar, agentPane);
+        VBox.setVgrow(agentPane, Priority.ALWAYS);
+        Tab agentTab = new Tab("Agent", agentContent);
         Tab regionTab = new Tab("Region", wrapInspectorContent(regionInspectorPanel));
         hoverTab.setClosable(false);
         agentTab.setClosable(false);
@@ -562,11 +576,65 @@ public class MainApp extends Application {
         agentInspectorPanel.update(snapshot, closestId);
     }
 
+    private void navigateAgent(int delta) {
+        if (lastSelectableAgentIds.isEmpty()) {
+            return;
+        }
+        int size = lastSelectableAgentIds.size();
+        long current = selectionState.getSelectedAgentId();
+        int index = lastSelectableAgentIds.indexOf(current);
+        if (index < 0) {
+            index = delta > 0 ? 0 : size - 1;
+        }
+        int nextIndex = (index + delta) % size;
+        if (nextIndex < 0) {
+            nextIndex += size;
+        }
+        selectAgent(lastSelectableAgentIds.get(nextIndex));
+    }
+
+    private void recomputeSelectableAgents(RenderSnapshot snapshot) {
+        lastSelectableAgentIds.clear();
+        if (snapshot == null) {
+            return;
+        }
+        int count = snapshot.getAgentCount();
+        long[] ids = snapshot.getAgentId();
+        if (selectionState.hasRegion()) {
+            int minX = Math.min(selectionState.getRegionStartX(), selectionState.getRegionEndX());
+            int maxX = Math.max(selectionState.getRegionStartX(), selectionState.getRegionEndX());
+            int minY = Math.min(selectionState.getRegionStartY(), selectionState.getRegionEndY());
+            int maxY = Math.max(selectionState.getRegionStartY(), selectionState.getRegionEndY());
+            minX = MathUtil.clamp(minX, 0, snapshot.getWidth() - 1);
+            maxX = MathUtil.clamp(maxX, 0, snapshot.getWidth() - 1);
+            minY = MathUtil.clamp(minY, 0, snapshot.getHeight() - 1);
+            maxY = MathUtil.clamp(maxY, 0, snapshot.getHeight() - 1);
+            int[] xs = snapshot.getAgentX();
+            int[] ys = snapshot.getAgentY();
+            int cap = UIConfig.REGION_AGENT_LIST_CAP;
+            for (int i = 0; i < count && lastSelectableAgentIds.size() < cap; i++) {
+                int x = xs[i];
+                int y = ys[i];
+                if (x >= minX && x <= maxX && y >= minY && y <= maxY) {
+                    lastSelectableAgentIds.add(ids[i]);
+                }
+            }
+        } else {
+            for (int i = 0; i < count && lastSelectableAgentIds.size() < AGENT_NAV_CAP; i++) {
+                lastSelectableAgentIds.add(ids[i]);
+            }
+        }
+    }
+
     private void selectAgentFromRegionList(long agentId) {
+        selectAgent(agentId);
+    }
+
+    private void selectAgent(long agentId) {
         selectionState.setSelectedAgentId(agentId);
         engine.queueSelectedAgentCommand(new SetSelectedAgentCommand(agentId));
         RenderSnapshot snapshot = engine.getLatestSnapshot();
-        if (snapshot != null) {
+        if (snapshot != null && agentId >= 0) {
             int count = snapshot.getAgentCount();
             long[] ids = snapshot.getAgentId();
             int[] xs = snapshot.getAgentX();
@@ -581,6 +649,8 @@ public class MainApp extends Application {
                 }
             }
             agentInspectorPanel.update(snapshot, agentId);
+        } else if (snapshot == null) {
+            agentInspectorPanel.clear();
         }
     }
 

@@ -24,7 +24,8 @@ public class SimulationLogger {
     private void handleEvent(SimulationEvent event) {
         if (event instanceof AgentDiedEvent died) {
             if (SimConfig.LOG_EVENTS_ENABLED) {
-                out.printf("[tick=%d] agent %d died at (%d,%d)%n", died.getTick(), died.getAgentId(), died.getX(), died.getY());
+                out.printf("[tick=%d] agent %d died cause=%s at (%d,%d)%n", died.getTick(), died.getAgentId(),
+                        died.getCause(), died.getX(), died.getY());
             }
             return;
         }

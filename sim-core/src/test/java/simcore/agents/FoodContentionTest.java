@@ -55,7 +55,7 @@ class FoodContentionTest {
         AgentSystem system = new AgentSystem(world, 5L, 0, null);
         system.spawnAgents(world, 0, 0, 1, 2, new Random(2));
         for (AgentState agent : system.getAgents()) {
-            agent.applyTick(0f, -0.9f, 0f);
+            agent.applyTick(-0.2f, -0.9f, 0f);
         }
 
         system.tick(world, 0);
@@ -75,7 +75,7 @@ class FoodContentionTest {
         AgentSystem system = new AgentSystem(world, 7L, 0, null);
         system.spawnAgents(world, 0, 0, 1, 1, new Random(3));
         AgentState agent = system.getAgents().get(0);
-        agent.applyTick(0f, -0.9f, 0f);
+        agent.applyTick(-0.2f, -0.9f, 0f);
         float hungerBeforeTick = agent.getHunger();
 
         system.tick(world, 0);
@@ -96,7 +96,7 @@ class FoodContentionTest {
         float normalizedHunger = 0.10f;
         for (AgentState agent : system.getAgents()) {
             agent.moveTo(0, 0);
-            agent.applyTick(0f, normalizedHunger - agent.getHunger(), 0f);
+            agent.applyTick(-0.2f, normalizedHunger - agent.getHunger(), 0f);
             hungerBeforeTick.put(agent.getId(), agent.getHunger());
         }
 

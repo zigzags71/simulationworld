@@ -75,6 +75,7 @@ public class AgentSystem {
         int agentCount = agents.size();
         ensureBuffers(agentCount);
         actionExecutor.prepareWorld(world);
+        actionExecutor.resetClaimsForTick();
         actionExecutor.beginTick(agentCount);
         actionExecutor.setMetrics(metrics);
         for (int i = 0; i < agentCount; i++) {

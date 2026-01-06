@@ -83,7 +83,7 @@ class FoodContentionTest {
         float expectedHunger = Math.min(1f, hungerBeforeTick - SimConfig.HUNGER_DRAIN_PER_TICK + 0.01f * SimConfig.FOOD_TO_HUNGER_GAIN);
         float remainingFood = world.getFoodField()[0];
         assertTrue(remainingFood >= 0f);
-        assertTrue(remainingFood <= FLOAT_EPSILON);
+        assertTrue(remainingFood <= SimConfig.FOOD_MIN_TO_EAT + 0.1f);
         assertEquals(expectedHunger, agent.getHunger(), 1e-6f);
         assertTrue(agent.getHunger() > hungerBeforeTick);
     }

@@ -25,16 +25,26 @@ public class ActionExecutor {
     private float[] claimedFood;
     private int claimedFoodTileCount = -1;
 
+    private void ensureClaimedFood(WorldGrid world) {
+        int tileCount = world.getWidth() * world.getHeight();
+        if (claimedFood == null || claimedFood.length != tileCount) {
+            claimedFood = new float[tileCount];
+        }
+    }
+
     public ActionExecutor(Random random) {
         this.random = random;
     }
 
     public void prepareWorld(WorldGrid world) {
-        int tileCount = world.getWidth() * world.getHeight();
-        if (claimedFood == null || claimedFood.length != tileCount) {
-            claimedFood = new float[tileCount];
+        ensureClaimedFood(world);
+        claimedFoodTileCount = world.getWidth() * world.getHeight();
+    }
+
+    public void resetClaimsForTick() {
+        if (claimedFood != null) {
+            Arrays.fill(claimedFood, 0f);
         }
-        claimedFoodTileCount = tileCount;
     }
 
     public void beginTick(int expectedAgents) {
@@ -63,6 +73,7 @@ public class ActionExecutor {
     }
 
     private OutcomeVector move(AgentState agent, WorldGrid world) {
+        ensureClaimedFood(world);
         int bestX = agent.getX();
         int bestY = agent.getY();
         int width = world.getWidth();
@@ -110,14 +121,12 @@ public class ActionExecutor {
     }
 
     public float computeLocalFoodCrowding(WorldGrid world, int ax, int ay, int radius) {
+        ensureClaimedFood(world);
         float[] food = world.getFoodField();
         int w = world.getWidth();
         int h = world.getHeight();
         int relevant = 0;
         int fullyClaimed = 0;
-        if (claimedFood == null || claimedFood.length != w * h) {
-            return 0f;
-        }
         for (int y = ay - radius; y <= ay + radius; y++) {
             if (y < 0 || y >= h) {
                 continue;
@@ -213,6 +222,7 @@ public class ActionExecutor {
     }
 
     private OutcomeVector eat(AgentState agent, WorldGrid world, int agentSlot, long tickIndex) {
+        ensureClaimedFood(world);
         int idx = MathUtil.index(agent.getX(), agent.getY(), world.getWidth());
         float[] food = world.getFoodField();
         float remaining = Math.max(0f, food[idx] - claimedFood[idx]);

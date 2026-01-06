@@ -89,6 +89,42 @@ public class ActionExecutor {
         return new OutcomeVector(-SimConfig.MOVE_ENERGY_COST, -SimConfig.MOVE_HUNGER_COST, 0f);
     }
 
+    private OutcomeVector exploratoryMove(AgentState agent, WorldGrid world) {
+        int bestX = agent.getX();
+        int bestY = agent.getY();
+        int width = world.getWidth();
+        int height = world.getHeight();
+        float[] food = world.getFoodField();
+        float[] hazard = world.getHazardField();
+        boolean[] water = world.getWaterMask();
+        float bestNeighborScore = Float.NEGATIVE_INFINITY;
+        float bestTieBreaker = -1f;
+        for (int dy = -1; dy <= 1; dy++) {
+            for (int dx = -1; dx <= 1; dx++) {
+                if (dx == 0 && dy == 0) {
+                    continue;
+                }
+                int nx = MathUtil.clamp(agent.getX() + dx, 0, width - 1);
+                int ny = MathUtil.clamp(agent.getY() + dy, 0, height - 1);
+                int idx = MathUtil.index(nx, ny, width);
+                if (water[idx]) {
+                    continue;
+                }
+                float score = food[idx] * SimConfig.MOVE_FOOD_WEIGHT - hazard[idx] * SimConfig.MOVE_HAZARD_WEIGHT;
+                float tieBreaker = random.nextFloat() * 0.0001f;
+                if (score > bestNeighborScore
+                        || (Math.abs(score - bestNeighborScore) < 1e-6f && tieBreaker > bestTieBreaker)) {
+                    bestNeighborScore = score;
+                    bestTieBreaker = tieBreaker;
+                    bestX = nx;
+                    bestY = ny;
+                }
+            }
+        }
+        agent.moveTo(bestX, bestY);
+        return new OutcomeVector(-SimConfig.MOVE_ENERGY_COST, -SimConfig.MOVE_HUNGER_COST, 0f);
+    }
+
     private OutcomeVector directedMove(AgentState agent, WorldGrid world, int targetX, int targetY) {
         int dx = Integer.compare(targetX, agent.getX());
         int dy = Integer.compare(targetY, agent.getY());
@@ -167,14 +203,14 @@ public class ActionExecutor {
         }
         SignalField field = world.getSignalField();
         if (field.isEmpty()) {
-            return move(agent, world);
+            return exploratoryMove(agent, world);
         }
         int baseRadius = SimConfig.SIGNAL_SENSE_RADIUS_BASE;
         int dynamic = (int) (agent.getPredictionError() * (SimConfig.SIGNAL_SENSE_RADIUS_MAX - baseRadius));
         int radius = Math.min(SimConfig.SIGNAL_SENSE_RADIUS_MAX, baseRadius + Math.max(0, dynamic));
         Signal best = field.bestSignalWithinRadius(agent.getX(), agent.getY(), radius, agent.getId().value());
         if (best == null) {
-            return move(agent, world);
+            return exploratoryMove(agent, world);
         }
         agent.setFollowLock(best.getX(), best.getY(), tickIndex + SimConfig.PATTERN_FOLLOW_LOCK_TICKS);
         agent.setFollowMemory(best.getId(), -1, best.getOriginAgentId(), tickIndex);

@@ -112,13 +112,19 @@ public final class RuleSelector {
     }
 
     private static float needUtility(ActionType action, AgentState agent) {
+        float hunger = MathUtil.clamp01(agent.getHunger());
+        float stress = MathUtil.clamp01(agent.getStress());
+        float hungry = 1f - hunger;
+
         return switch (action) {
-            case EAT -> 1f - agent.getHunger();
-            case MOVE -> MathUtil.clamp01(agent.getStress());
-            case IDLE -> MathUtil.clamp01(1f - agent.getStress());
-            case BROADCAST_SIGNAL -> MathUtil.clamp01(agent.getHunger()) * 0.5f
-                    + MathUtil.clamp01(agent.getStress()) * 0.1f;
-            case FOLLOW_SIGNAL -> MathUtil.clamp01(1f - agent.getHunger());
+            case EAT -> hungry;
+
+            case MOVE -> MathUtil.clamp01(hungry * 1.0f + stress * 0.15f);
+
+            case IDLE -> MathUtil.clamp01(hunger * (1f - stress));
+
+            case BROADCAST_SIGNAL -> MathUtil.clamp01(hunger) * 0.5f + stress * 0.1f;
+            case FOLLOW_SIGNAL -> hungry;
         };
     }
 }

@@ -185,7 +185,7 @@ public class AgentSystem {
         return metrics;
     }
 
-    public float computeLocalFoodCrowding(int ax, int ay) {
+    public float computeLocalFoodCrowding(WorldGrid world, int ax, int ay) {
         return actionExecutor.computeLocalFoodCrowding(world, ax, ay, SimConfig.CROWDING_RADIUS);
     }
 

@@ -182,6 +182,7 @@ public class SimulationEngine {
             world.tickEmitters(currentTick);
             world.getSignalField().tickDecay();
             metrics = agents.tick(world, currentTick);
+            populateFoodBudgetMetrics(metrics, currentTick);
             if (SimConfig.FOOD_REGEN_PER_TICK > 0f) {
                 world.regenerateFood(SimConfig.FOOD_REGEN_PER_TICK);
             }
@@ -222,7 +223,24 @@ public class SimulationEngine {
                 metrics.getMeanStress(),
                 metrics.getMeanHazard(),
                 world.getEmittersView().size(),
-                world.getSpawnersView().size());
+                world.getSpawnersView().size(),
+                metrics.getEstimatedFoodPerTick(),
+                metrics.getEstimatedMaxEatersPerTick());
+    }
+
+    private void populateFoodBudgetMetrics(AgentTickMetrics metrics, long tick) {
+        float totalFoodPerTick = 0f;
+        for (FoodEmitter emitter : world.getEmittersView()) {
+            if (!emitter.isEnabled() || emitter.isExpired(tick)) {
+                continue;
+            }
+            int r = emitter.getRadius();
+            float areaFactor = Math.max(1f, 0.55f * (float) Math.PI * r * r);
+            totalFoodPerTick += emitter.getStrengthPerTick() * areaFactor;
+        }
+        metrics.setEstimatedFoodPerTick(totalFoodPerTick);
+        float maxEatersPerTick = SimConfig.FOOD_CONSUME_RATE <= 0f ? 0f : totalFoodPerTick / SimConfig.FOOD_CONSUME_RATE;
+        metrics.setEstimatedMaxEatersPerTick(maxEatersPerTick);
     }
 
     private void emitSelectedAgentSnapshot(long currentTick) {

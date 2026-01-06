@@ -12,6 +12,8 @@ public class AgentTickMetrics {
     private float totalStress;
     private float totalHazard;
     private float totalPredictionError;
+    private float estimatedFoodPerTick;
+    private float estimatedMaxEatersPerTick;
 
     public void accumulate(AgentState agent, float hazard) {
         totalEnergy += agent.getEnergy();
@@ -84,5 +86,21 @@ public class AgentTickMetrics {
 
     public float getMeanPredictionError() {
         return population == 0 ? 0f : totalPredictionError / population;
+    }
+
+    public void setEstimatedFoodPerTick(float estimatedFoodPerTick) {
+        this.estimatedFoodPerTick = estimatedFoodPerTick;
+    }
+
+    public float getEstimatedFoodPerTick() {
+        return estimatedFoodPerTick;
+    }
+
+    public void setEstimatedMaxEatersPerTick(float estimatedMaxEatersPerTick) {
+        this.estimatedMaxEatersPerTick = estimatedMaxEatersPerTick;
+    }
+
+    public float getEstimatedMaxEatersPerTick() {
+        return estimatedMaxEatersPerTick;
     }
 }

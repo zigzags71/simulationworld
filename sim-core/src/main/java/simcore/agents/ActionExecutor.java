@@ -114,6 +114,9 @@ public class ActionExecutor {
             }
         }
         if (bestNeighborScore <= currentScore) {
+            if (agent.getHunger() < 0.45f) {
+                return exploratoryMove(agent, world);
+            }
             return idle();
         }
         agent.moveTo(bestX, bestY);

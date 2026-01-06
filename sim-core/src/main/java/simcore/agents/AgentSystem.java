@@ -66,7 +66,7 @@ public class AgentSystem {
                 totalDeaths++;
                 metrics.markDeath();
                 if (eventBus != null && SimConfig.LOG_EVENTS_ENABLED) {
-                    eventBus.publish(new AgentDiedEvent(agent.getId().value(), tickIndex, agent.getX(), agent.getY()));
+                    eventBus.publish(new AgentDiedEvent(agent.getId().value(), tickIndex, agent.getX(), agent.getY(), DeathCause.ENERGY_DEPLETED));
                 }
             }
         }
@@ -163,7 +163,7 @@ public class AgentSystem {
                 totalDeaths++;
                 metrics.markDeath();
                 if (eventBus != null && SimConfig.LOG_EVENTS_ENABLED) {
-                    eventBus.publish(new AgentDiedEvent(agent.getId().value(), tickIndex, agent.getX(), agent.getY()));
+                    eventBus.publish(new AgentDiedEvent(agent.getId().value(), tickIndex, agent.getX(), agent.getY(), DeathCause.ENERGY_DEPLETED));
                 }
                 continue;
             }

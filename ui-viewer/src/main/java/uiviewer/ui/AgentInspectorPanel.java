@@ -21,6 +21,7 @@ public class AgentInspectorPanel extends VBox {
     private final Label hungerLabel = new Label("Hunger: --");
     private final Label stressLabel = new Label("Stress: --");
     private final Label predictionErrorLabel = new Label("Prediction Error: --");
+    private final Label socialCreditLabel = new Label("Social: --");
     private final Label awarenessLabel = new Label("Awareness: --");
     private final Label cultureLabel = new Label("Culture: --");
     private final ListView<String> rulesList = new ListView<>();
@@ -29,7 +30,7 @@ public class AgentInspectorPanel extends VBox {
         setSpacing(4);
         rulesList.setPlaceholder(new Label("No rules"));
         getChildren().addAll(idLabel, nameLabel, positionLabel, ageLabel, energyLabel, hungerLabel, stressLabel,
-                predictionErrorLabel, awarenessLabel, cultureLabel, new Label("Rules"), rulesList);
+                predictionErrorLabel, socialCreditLabel, awarenessLabel, cultureLabel, new Label("Rules"), rulesList);
     }
 
     public void clear() {
@@ -41,6 +42,7 @@ public class AgentInspectorPanel extends VBox {
         hungerLabel.setText("Hunger: --");
         stressLabel.setText("Stress: --");
         predictionErrorLabel.setText("Prediction Error: --");
+        socialCreditLabel.setText("Social: --");
         awarenessLabel.setText("Awareness: --");
         cultureLabel.setText("Culture: --");
         rulesList.getItems().clear();
@@ -63,6 +65,7 @@ public class AgentInspectorPanel extends VBox {
         hungerLabel.setText(String.format("Hunger: %.3f", details.getHunger()));
         stressLabel.setText(String.format("Stress: %.3f", details.getStress()));
         predictionErrorLabel.setText(String.format("Prediction Error: %.3f", details.getPredictionError()));
+        socialCreditLabel.setText(String.format("Social: %.3f", details.getSocialCredit()));
         awarenessLabel.setText("Awareness: " + details.isAwareness());
         nameLabel.setText("Name: " + NameRegistry.resolveFirstName(details.getFirstNameId()) + " "
                 + NameRegistry.resolveSurname(details.getSurnameId()));

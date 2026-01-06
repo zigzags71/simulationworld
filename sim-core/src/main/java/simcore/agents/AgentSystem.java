@@ -185,6 +185,10 @@ public class AgentSystem {
         return metrics;
     }
 
+    public float computeLocalFoodCrowding(int ax, int ay) {
+        return actionExecutor.computeLocalFoodCrowding(world, ax, ay, SimConfig.CROWDING_RADIUS);
+    }
+
     private void ensureBuffers(int count) {
         if (baseDeltas.length < count) {
             baseDeltas = new OutcomeVector[count];

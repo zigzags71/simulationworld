@@ -51,12 +51,15 @@ public class ActionExecutor {
     private OutcomeVector move(AgentState agent, WorldGrid world) {
         int bestX = agent.getX();
         int bestY = agent.getY();
-        float bestScore = Float.NEGATIVE_INFINITY;
         int width = world.getWidth();
         int height = world.getHeight();
         float[] food = world.getFoodField();
         float[] hazard = world.getHazardField();
         boolean[] water = world.getWaterMask();
+        int currentIdx = MathUtil.index(agent.getX(), agent.getY(), width);
+        float currentScore = food[currentIdx] * SimConfig.MOVE_FOOD_WEIGHT - hazard[currentIdx] * SimConfig.MOVE_HAZARD_WEIGHT;
+        float bestNeighborScore = Float.NEGATIVE_INFINITY;
+        float bestTieBreaker = -1f;
         for (int dy = -1; dy <= 1; dy++) {
             for (int dx = -1; dx <= 1; dx++) {
                 if (dx == 0 && dy == 0) {
@@ -69,9 +72,50 @@ public class ActionExecutor {
                     continue;
                 }
                 float score = food[idx] * SimConfig.MOVE_FOOD_WEIGHT - hazard[idx] * SimConfig.MOVE_HAZARD_WEIGHT;
-                score += random.nextFloat() * 0.01f;
-                if (score > bestScore) {
-                    bestScore = score;
+                float tieBreaker = random.nextFloat() * 0.0001f;
+                if (score > bestNeighborScore
+                        || (Math.abs(score - bestNeighborScore) < 1e-6f && tieBreaker > bestTieBreaker)) {
+                    bestNeighborScore = score;
+                    bestTieBreaker = tieBreaker;
+                    bestX = nx;
+                    bestY = ny;
+                }
+            }
+        }
+        if (bestNeighborScore <= currentScore) {
+            return idle();
+        }
+        agent.moveTo(bestX, bestY);
+        return new OutcomeVector(-SimConfig.MOVE_ENERGY_COST, -SimConfig.MOVE_HUNGER_COST, 0f);
+    }
+
+    private OutcomeVector exploratoryMove(AgentState agent, WorldGrid world) {
+        int bestX = agent.getX();
+        int bestY = agent.getY();
+        int width = world.getWidth();
+        int height = world.getHeight();
+        float[] food = world.getFoodField();
+        float[] hazard = world.getHazardField();
+        boolean[] water = world.getWaterMask();
+        float bestNeighborScore = Float.NEGATIVE_INFINITY;
+        float bestTieBreaker = -1f;
+        for (int dy = -1; dy <= 1; dy++) {
+            for (int dx = -1; dx <= 1; dx++) {
+                if (dx == 0 && dy == 0) {
+                    continue;
+                }
+                int nx = MathUtil.clamp(agent.getX() + dx, 0, width - 1);
+                int ny = MathUtil.clamp(agent.getY() + dy, 0, height - 1);
+                int idx = MathUtil.index(nx, ny, width);
+                if (water[idx]) {
+                    continue;
+                }
+                float score = food[idx] * SimConfig.MOVE_FOOD_WEIGHT - hazard[idx] * SimConfig.MOVE_HAZARD_WEIGHT;
+                float tieBreaker = random.nextFloat() * 0.0001f;
+                if (score > bestNeighborScore
+                        || (Math.abs(score - bestNeighborScore) < 1e-6f && tieBreaker > bestTieBreaker)) {
+                    bestNeighborScore = score;
+                    bestTieBreaker = tieBreaker;
                     bestX = nx;
                     bestY = ny;
                 }
@@ -115,7 +159,7 @@ public class ActionExecutor {
 
     private OutcomeVector eat(AgentState agent, WorldGrid world, int agentSlot, long tickIndex) {
         int idx = MathUtil.index(agent.getX(), agent.getY(), world.getWidth());
-        eatRequests.add(idx, agent.getId().value(), agentSlot, SimConfig.FOOD_CONSUME_RATE, tickIndex);
+        eatRequests.add(idx, agent.getId().value(), agentSlot, SimConfig.FOOD_CONSUME_RATE, tickIndex, agent.getEnergy());
         return OutcomeVector.zero();
     }
 
@@ -159,14 +203,14 @@ public class ActionExecutor {
         }
         SignalField field = world.getSignalField();
         if (field.isEmpty()) {
-            return move(agent, world);
+            return exploratoryMove(agent, world);
         }
         int baseRadius = SimConfig.SIGNAL_SENSE_RADIUS_BASE;
         int dynamic = (int) (agent.getPredictionError() * (SimConfig.SIGNAL_SENSE_RADIUS_MAX - baseRadius));
         int radius = Math.min(SimConfig.SIGNAL_SENSE_RADIUS_MAX, baseRadius + Math.max(0, dynamic));
         Signal best = field.bestSignalWithinRadius(agent.getX(), agent.getY(), radius, agent.getId().value());
         if (best == null) {
-            return move(agent, world);
+            return exploratoryMove(agent, world);
         }
         agent.setFollowLock(best.getX(), best.getY(), tickIndex + SimConfig.PATTERN_FOLLOW_LOCK_TICKS);
         agent.setFollowMemory(best.getId(), -1, best.getOriginAgentId(), tickIndex);
@@ -254,7 +298,8 @@ public class ActionExecutor {
             float consumed = Math.min(desired, available);
             boolean success = consumed > 0f;
             available -= consumed;
-            float hungerGain = consumed * SimConfig.FOOD_TO_HUNGER_GAIN;
+            float energyAtRequest = eatRequests.getEnergyAtRequest(requestIndex);
+            float hungerGain = (energyAtRequest < 0.999f) ? (consumed * SimConfig.FOOD_TO_HUNGER_GAIN) : 0f;
             float energyGain = consumed * SimConfig.FOOD_TO_ENERGY_GAIN;
             boolean fullBite = consumed >= desired;
             float stressChange = success
@@ -275,6 +320,7 @@ public class ActionExecutor {
         private int[] agentSlot = new int[0];
         private float[] desiredAmount = new float[0];
         private long[] tick = new long[0];
+        private float[] agentEnergyAtRequest = new float[0];
         private int size;
 
         void reset(int capacityHint) {
@@ -282,13 +328,14 @@ public class ActionExecutor {
             size = 0;
         }
 
-        void add(int tileIndex, long agentId, int agentSlot, float desiredAmount, long tick) {
+        void add(int tileIndex, long agentId, int agentSlot, float desiredAmount, long tick, float energyAtRequest) {
             ensureCapacity(size + 1);
             this.tileIndex[size] = tileIndex;
             this.agentId[size] = agentId;
             this.agentSlot[size] = agentSlot;
             this.desiredAmount[size] = desiredAmount;
             this.tick[size] = tick;
+            this.agentEnergyAtRequest[size] = energyAtRequest;
             size++;
         }
 
@@ -316,6 +363,10 @@ public class ActionExecutor {
             return tick[index];
         }
 
+        float getEnergyAtRequest(int index) {
+            return agentEnergyAtRequest[index];
+        }
+
         private void ensureCapacity(int required) {
             if (required <= tileIndex.length) {
                 return;
@@ -326,6 +377,7 @@ public class ActionExecutor {
             agentSlot = resize(agentSlot, newSize);
             desiredAmount = resize(desiredAmount, newSize);
             tick = resize(tick, newSize);
+            agentEnergyAtRequest = resize(agentEnergyAtRequest, newSize);
         }
 
         private int[] resize(int[] arr, int newSize) {

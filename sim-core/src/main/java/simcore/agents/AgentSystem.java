@@ -20,7 +20,9 @@ import simcore.world.objects.FoodEmitter;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 
 public class AgentSystem {
@@ -35,6 +37,8 @@ public class AgentSystem {
     private AgentState[] agentBuffer = new AgentState[0];
     private float[] hazardBuffer = new float[0];
     private boolean[] skipBuffer = new boolean[0];
+    private float[] personalStressBuffer = new float[0];
+    private float[] neighborStressBuffer = new float[0];
     private final long worldSeed;
     private long nextId;
     private int totalDeaths;
@@ -152,8 +156,30 @@ public class AgentSystem {
             }
             OutcomeVector totalDelta = baseDeltas[i].add(actionDelta);
             agent.applyTick(totalDelta.getDeltaEnergy(), totalDelta.getDeltaHunger(), totalDelta.getDeltaStress());
+            personalStressBuffer[i] = agent.getStress();
+            if (agent.isDead()) {
+                agents.remove(i);
+                totalDeaths++;
+                metrics.markDeath();
+                if (eventBus != null && SimConfig.LOG_EVENTS_ENABLED) {
+                    eventBus.publish(new AgentDiedEvent(agent.getId().value(), tickIndex, agent.getX(), agent.getY()));
+                }
+                continue;
+            }
+        }
+        applyNeighborStressSharing(agentCount);
+        for (int i = agentCount - 1; i >= 0; i--) {
+            if (skipBuffer[i]) {
+                continue;
+            }
+            AgentState agent = agentBuffer[i];
+            Rule rule = chosenRules[i];
+            if (agent == null || agent.isDead()) {
+                continue;
+            }
             agent.updateAwarenessLevelFromStress(SimConfig.AWARE_T1, SimConfig.AWARE_T2, SimConfig.AWARE_T3,
                     SimConfig.AWARE_HYST);
+            OutcomeVector before = beforeStates[i];
             OutcomeVector after = OutcomeVector.fromAgent(agent.getEnergy(), agent.getHunger(), agent.getStress());
             if (rule != null) {
                 OutcomeVector observed = after.deltaFrom(before);
@@ -164,15 +190,6 @@ public class AgentSystem {
                     eventBus.publish(new RuleExecutedEvent(agent.getId().value(), rule.getRuleId(), rule.getAction(), rule.getTrust(),
                             error, tickIndex));
                 }
-            }
-            if (agent.isDead()) {
-                agents.remove(i);
-                totalDeaths++;
-                metrics.markDeath();
-                if (eventBus != null && SimConfig.LOG_EVENTS_ENABLED) {
-                    eventBus.publish(new AgentDiedEvent(agent.getId().value(), tickIndex, agent.getX(), agent.getY()));
-                }
-                continue;
             }
             metrics.accumulate(agent, hazardBuffer[i]);
         }
@@ -191,6 +208,8 @@ public class AgentSystem {
             agentBuffer = new AgentState[count];
             hazardBuffer = new float[count];
             skipBuffer = new boolean[count];
+            personalStressBuffer = new float[count];
+            neighborStressBuffer = new float[count];
         }
     }
 
@@ -276,6 +295,75 @@ public class AgentSystem {
             }
         }
         return null;
+    }
+
+    private void applyNeighborStressSharing(int agentCount) {
+        float weight = SimConfig.STRESS_NEIGHBOR_WEIGHT;
+        int radius = SimConfig.STRESS_NEIGHBOR_RADIUS;
+        if (weight <= 0f || radius <= 0) {
+            return;
+        }
+        int cellSize = radius;
+        Map<Long, List<Integer>> buckets = new HashMap<>();
+        for (int i = 0; i < agentCount; i++) {
+            AgentState agent = agentBuffer[i];
+            if (agent == null || agent.isDead() || skipBuffer[i]) {
+                continue;
+            }
+            int cellX = agent.getX() / cellSize;
+            int cellY = agent.getY() / cellSize;
+            long key = (((long) cellX) << 32) ^ (cellY & 0xffffffffL);
+            buckets.computeIfAbsent(key, k -> new ArrayList<>()).add(i);
+        }
+        int radiusSq = radius * radius;
+        for (int i = 0; i < agentCount; i++) {
+            AgentState agent = agentBuffer[i];
+            if (agent == null || agent.isDead() || skipBuffer[i]) {
+                continue;
+            }
+            int cellX = agent.getX() / cellSize;
+            int cellY = agent.getY() / cellSize;
+            float sum = 0f;
+            int count = 0;
+            for (int dy = -1; dy <= 1 && count < SimConfig.STRESS_NEIGHBOR_SAMPLE_MAX; dy++) {
+                for (int dx = -1; dx <= 1 && count < SimConfig.STRESS_NEIGHBOR_SAMPLE_MAX; dx++) {
+                    long key = (((long) (cellX + dx)) << 32) ^ ((cellY + dy) & 0xffffffffL);
+                    List<Integer> indices = buckets.get(key);
+                    if (indices == null) {
+                        continue;
+                    }
+                    for (int idx : indices) {
+                        if (idx == i) {
+                            continue;
+                        }
+                        AgentState neighbor = agentBuffer[idx];
+                        if (neighbor == null || neighbor.isDead()) {
+                            continue;
+                        }
+                        int ddx = neighbor.getX() - agent.getX();
+                        int ddy = neighbor.getY() - agent.getY();
+                        if (ddx * ddx + ddy * ddy > radiusSq) {
+                            continue;
+                        }
+                        sum += personalStressBuffer[idx];
+                        count++;
+                        if (count >= SimConfig.STRESS_NEIGHBOR_SAMPLE_MAX) {
+                            break;
+                        }
+                    }
+                }
+            }
+            neighborStressBuffer[i] = count > 0 ? sum / count : 0f;
+        }
+        for (int i = 0; i < agentCount; i++) {
+            AgentState agent = agentBuffer[i];
+            if (agent == null || agent.isDead() || skipBuffer[i]) {
+                continue;
+            }
+            float personal = personalStressBuffer[i];
+            float blended = MathUtil.clamp01(personal * (1f - weight) + neighborStressBuffer[i] * weight);
+            agent.setStress(blended);
+        }
     }
 
     private int[] computeCrowding(int width, int height) {

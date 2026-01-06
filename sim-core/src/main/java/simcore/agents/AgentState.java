@@ -98,6 +98,10 @@ public class AgentState {
         return stress;
     }
 
+    public void setStress(float stress) {
+        this.stress = clampMetric(stress);
+    }
+
     public float getPredictionError() {
         return predictionError;
     }

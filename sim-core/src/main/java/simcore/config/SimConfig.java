@@ -71,6 +71,10 @@ public final class SimConfig {
 
     public static final float CROWDING_MAX_EXPECTED = 6f;
 
+    public static final int STRESS_NEIGHBOR_RADIUS = 8;
+    public static final float STRESS_NEIGHBOR_WEIGHT = 0.25f;
+    public static final int STRESS_NEIGHBOR_SAMPLE_MAX = 12;
+
     public static final int SIGNAL_TTL_TICKS = 600;
     public static final int SIGNAL_PICKUP_RADIUS_BASE = 6;
     public static final int SIGNAL_SENSE_RADIUS_BASE = 12;

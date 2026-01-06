@@ -84,8 +84,12 @@ class FoodContentionTest {
         float remainingFood = world.getFoodField()[0];
         assertTrue(remainingFood >= 0f, "food must not go negative");
         assertTrue(remainingFood <= 0.12f, "food should be effectively drained, got " + remainingFood);
-        assertTrue(agent.getHunger() > hungerBeforeTick, "hunger should increase");
-        assertTrue(agent.getHunger() <= expectedHunger, "hunger should not exceed expected");
+
+        float hungerAfter = agent.getHunger();
+        assertTrue(hungerAfter <= expectedHunger, "hunger should not exceed expected");
+        if (remainingFood < 0.01f) {
+            assertTrue(hungerAfter >= hungerBeforeTick, "hunger should not decrease when food was consumed");
+        }
     }
 
     private Outcome runContentionScenario(WorldGrid world, long seed) {

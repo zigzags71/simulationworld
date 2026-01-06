@@ -35,6 +35,8 @@ class SimulationEngineTelemetryTest {
         assertEquals(2, first.getActiveSignalsCount());
         assertEquals(3, second.getTotalSignalsEmitted());
         assertEquals(1, second.getTotalFollowMoves());
+        assertTrue(first.getEmitterCount() >= 0);
+        assertTrue(second.getSpawnerCount() >= 0);
         assertTrue(second.getTotalSignalsEmitted() >= first.getSignalsEmittedThisTick() + second.getSignalsEmittedThisTick());
     }
 }

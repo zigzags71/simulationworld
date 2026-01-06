@@ -12,12 +12,13 @@ public class Signal {
     private int ttlTicks;
     private final int generation;
     private final long originAgentId;
+    private final long leaderAgentId;
     private final float originSocialCredit;
     private final long emitterId;
     private final long createdTick;
 
     public Signal(long id, int x, int y, int strengthBucket, float confidence, int ttlTicks, int generation,
-                  long originAgentId, float originSocialCredit, long emitterId, long createdTick) {
+                  long originAgentId, long leaderAgentId, float originSocialCredit, long emitterId, long createdTick) {
         this.id = id;
         this.x = x;
         this.y = y;
@@ -26,6 +27,7 @@ public class Signal {
         this.ttlTicks = Math.max(0, ttlTicks);
         this.generation = generation;
         this.originAgentId = originAgentId;
+        this.leaderAgentId = leaderAgentId;
         this.originSocialCredit = originSocialCredit;
         this.emitterId = emitterId;
         this.createdTick = createdTick;
@@ -65,6 +67,10 @@ public class Signal {
 
     public long getOriginAgentId() {
         return originAgentId;
+    }
+
+    public long getLeaderAgentId() {
+        return leaderAgentId;
     }
 
     public float getOriginSocialCredit() {

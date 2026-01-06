@@ -29,7 +29,7 @@ public class SignalPropagationDeterminismTest {
         world.addEmitter(world.getWidth() / 2, world.getHeight() / 2, 8, 0.1f, true);
 
         for (int t = 0; t < 120; t++) {
-            world.tickEmitters();
+            world.tickEmitters(t);
             world.getSignalField().tickDecay();
             agents.tick(world, t);
         }

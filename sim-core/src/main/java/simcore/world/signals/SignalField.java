@@ -42,7 +42,7 @@ public class SignalField {
     }
 
     public Signal addSignal(int x, int y, int strengthBucket, float confidence, int ttl, int generation, long originAgentId,
-                            float originSocialCredit, long emitterId, long tick) {
+                            long leaderAgentId, float originSocialCredit, long emitterId, long tick) {
         strengthBucket = Math.max(0, Math.min(SimConfig.SIGNAL_STRENGTH_BINS, strengthBucket));
         confidence = MathUtil.clamp01(confidence);
         ttl = Math.max(0, ttl);
@@ -59,7 +59,7 @@ public class SignalField {
             removeFromEmitterMap(removed);
         }
         Signal signal = new Signal(nextSignalId++, x, y, strengthBucket, confidence, ttl, generation, originAgentId,
-                originSocialCredit, emitterId, tick);
+                leaderAgentId, originSocialCredit, emitterId, tick);
         signals.add(signal);
         addToBucket(signal);
         activeEmitterSignals.put(emitterId, signal);

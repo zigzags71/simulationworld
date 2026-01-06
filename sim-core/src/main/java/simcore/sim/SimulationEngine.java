@@ -179,7 +179,7 @@ public class SimulationEngine {
         AgentTickMetrics metrics = null;
         long currentTick = tickIndex;
         if (running.get()) {
-            world.tickEmitters();
+            world.tickEmitters(currentTick);
             world.getSignalField().tickDecay();
             metrics = agents.tick(world, currentTick);
             if (SimConfig.FOOD_REGEN_PER_TICK > 0f) {
@@ -220,7 +220,9 @@ public class SimulationEngine {
                 metrics.getMeanEnergy(),
                 metrics.getMeanHunger(),
                 metrics.getMeanStress(),
-                metrics.getMeanHazard());
+                metrics.getMeanHazard(),
+                world.getEmittersView().size(),
+                world.getSpawnersView().size());
     }
 
     private void emitSelectedAgentSnapshot(long currentTick) {

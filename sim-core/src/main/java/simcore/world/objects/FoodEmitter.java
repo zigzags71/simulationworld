@@ -12,6 +12,8 @@ public class FoodEmitter {
     private int radius;
     private float strengthPerTick;
     private boolean enabled;
+    private long expiresAtTick = Long.MAX_VALUE;
+    private long leaderAgentId = -1;
 
     public FoodEmitter(long id, int x, int y, int radius, float strengthPerTick, boolean enabled) {
         this.id = id;
@@ -44,6 +46,32 @@ public class FoodEmitter {
 
     public boolean isEnabled() {
         return enabled;
+    }
+
+    public long getExpiresAtTick() {
+        return expiresAtTick;
+    }
+
+    public void setExpiresAtTick(long tick) {
+        this.expiresAtTick = tick;
+    }
+
+    public boolean isExpired(long tick) {
+        return tick >= expiresAtTick;
+    }
+
+    public long getLeaderAgentId() {
+        return leaderAgentId;
+    }
+
+    public boolean hasLeader() {
+        return leaderAgentId != -1;
+    }
+
+    public void setLeaderAgentId(long agentId) {
+        if (leaderAgentId == -1) {
+            this.leaderAgentId = agentId;
+        }
     }
 
     public void setRadius(int radius) {

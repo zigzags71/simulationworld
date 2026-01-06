@@ -79,6 +79,7 @@ public class AgentSystem {
         for (int i = 0; i < agentCount; i++) {
             AgentState agent = agents.get(i);
             agentBuffer[i] = agent;
+            actionDeltas[i] = null;
             chosenRules[i] = null;
             skipBuffer[i] = false;
             if (agent == null) {
@@ -103,7 +104,7 @@ public class AgentSystem {
             ContextKey contextKey = buildContext(agent, world, crowding, tickIndex);
             Rule rule = RuleSelector.choose(RuleSelector.applicable(agent.getRulebook(), contextKey), agent, random);
             if (rule == null) {
-                skipBuffer[i] = true;
+                actionDeltas[i] = actionExecutor.execute(ActionType.IDLE, agent, world, i, tickIndex);
                 continue;
             }
             chosenRules[i] = rule;

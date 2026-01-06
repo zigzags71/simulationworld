@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import simcore.config.SimConfig;
 import simcore.world.WorldGrid;
 
+import java.lang.reflect.Field;
 import java.util.Random;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -54,5 +55,25 @@ class StressSharingTest {
 
         assertEquals(0.0f, lowStress.getStress());
         assertTrue(highStress.getStress() > 0.6f);
+    }
+
+    @Test
+    void contextMismatchStillAppliesMetabolism() throws Exception {
+        float[] food = new float[4];
+        float[] hazard = new float[4];
+        boolean[] water = new boolean[4];
+        WorldGrid world = new WorldGrid(2, 2, 15L, food, hazard, water);
+        AgentSystem system = new AgentSystem(world, 6L, 1, null);
+
+        AgentState agent = system.getAgents().get(0);
+        agent.setStress(1.0f);
+
+        Field rulebookField = AgentState.class.getDeclaredField("rulebook");
+        rulebookField.setAccessible(true);
+        ((java.util.List<?>) rulebookField.get(agent)).clear();
+
+        system.tick(world, 0);
+
+        assertTrue(agent.getStress() < 1.0f);
     }
 }

@@ -83,6 +83,7 @@ public class MainApp extends Application {
     private Slider agentSpawnSlider;
     private TextField seedField;
     private ChoiceBox<Integer> speedChoice;
+    private CheckBox defaultSpawnerToggle;
 
     @Override
     public void start(Stage primaryStage) {

@@ -306,7 +306,7 @@ public class AgentState {
     }
 
     public boolean isDead() {
-        return energy <= 0f || hunger <= 0f || stress >= 1f;
+        return energy <= 0f || hunger <= 0f || (ageTicks > 0 && stress >= 1f);
     }
 
     private float clampMetric(float value) {

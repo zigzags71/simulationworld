@@ -61,6 +61,7 @@ public final class SimConfig {
     public static final float MOVE_HAZARD_WEIGHT = 0.8f;
     public static final float MOVE_ENERGY_COST = 0.0006f;
     public static final float MOVE_HUNGER_COST = 0.0005f;
+    public static final float MOVE_WANDER_HUNGER_THRESHOLD = 0.55f;
 
     public static final int PATTERN_FOLLOW_LOCK_TICKS = 60;
     public static final int PATTERN_FOOD_LOCK_TICKS = 45;

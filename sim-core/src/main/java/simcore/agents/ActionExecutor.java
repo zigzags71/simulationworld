@@ -114,8 +114,8 @@ public class ActionExecutor {
             }
         }
         if (bestNeighborScore <= currentScore) {
-            if (agent.getHunger() < 0.45f) {
-                return exploratoryMove(agent, world);
+            if (agent.getHunger() <= SimConfig.MOVE_WANDER_HUNGER_THRESHOLD) {
+                return wanderMove(agent, world);
             }
             return idle();
         }
@@ -156,16 +156,13 @@ public class ActionExecutor {
         return fullyClaimed / (float) relevant;
     }
 
-    private OutcomeVector exploratoryMove(AgentState agent, WorldGrid world) {
-        int bestX = agent.getX();
-        int bestY = agent.getY();
+    private OutcomeVector wanderMove(AgentState agent, WorldGrid world) {
         int width = world.getWidth();
         int height = world.getHeight();
-        float[] food = world.getFoodField();
-        float[] hazard = world.getHazardField();
         boolean[] water = world.getWaterMask();
-        float bestNeighborScore = Float.NEGATIVE_INFINITY;
-        float bestTieBreaker = -1f;
+        int[] candidateXs = new int[8];
+        int[] candidateYs = new int[8];
+        int candidateCount = 0;
         for (int dy = -1; dy <= 1; dy++) {
             for (int dx = -1; dx <= 1; dx++) {
                 if (dx == 0 && dy == 0) {
@@ -177,18 +174,16 @@ public class ActionExecutor {
                 if (water[idx]) {
                     continue;
                 }
-                float score = food[idx] * SimConfig.MOVE_FOOD_WEIGHT - hazard[idx] * SimConfig.MOVE_HAZARD_WEIGHT;
-                float tieBreaker = random.nextFloat() * 0.0001f;
-                if (score > bestNeighborScore
-                        || (Math.abs(score - bestNeighborScore) < 1e-6f && tieBreaker > bestTieBreaker)) {
-                    bestNeighborScore = score;
-                    bestTieBreaker = tieBreaker;
-                    bestX = nx;
-                    bestY = ny;
-                }
+                candidateXs[candidateCount] = nx;
+                candidateYs[candidateCount] = ny;
+                candidateCount++;
             }
         }
-        agent.moveTo(bestX, bestY);
+        if (candidateCount == 0) {
+            return idle();
+        }
+        int choice = random.nextInt(candidateCount);
+        agent.moveTo(candidateXs[choice], candidateYs[choice]);
         return new OutcomeVector(-SimConfig.MOVE_ENERGY_COST, -SimConfig.MOVE_HUNGER_COST, 0f);
     }
 

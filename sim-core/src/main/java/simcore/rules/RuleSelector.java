@@ -75,7 +75,7 @@ public final class RuleSelector {
         boolean broadcastReady = (affordance & (1 << 3)) != 0;
         boolean broadcastAvailable = (affordance & (1 << 5)) != 0;
         return switch (action) {
-            case EAT -> hasAnyFoodHere;
+            case EAT -> hasGoodFoodHere;
             case FOLLOW_SIGNAL -> hasSignal && !hasGoodFoodHere;
             case BROADCAST_SIGNAL -> broadcastAvailable && emitterNearby && broadcastReady;
             case MOVE, IDLE -> true;
@@ -85,6 +85,25 @@ public final class RuleSelector {
     public static Rule choose(List<Rule> candidates, AgentState agent, Random random) {
         if (candidates.isEmpty()) {
             return null;
+        }
+        boolean hungry = agent.getHunger() < SimConfig.CONSUME_HUNGER_THRESHOLD;
+        if (hungry) {
+            Rule bestMove = null;
+            boolean hasEat = false;
+            for (Rule rule : candidates) {
+                if (rule.getAction() == ActionType.EAT) {
+                    hasEat = true;
+                    break;
+                }
+                if (rule.getAction() == ActionType.MOVE) {
+                    if (bestMove == null || rule.getTrust() > bestMove.getTrust()) {
+                        bestMove = rule;
+                    }
+                }
+            }
+            if (!hasEat && bestMove != null) {
+                return bestMove;
+            }
         }
         float total = 0f;
         float[] weights = new float[candidates.size()];

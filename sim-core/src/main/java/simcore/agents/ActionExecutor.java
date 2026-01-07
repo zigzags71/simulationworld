@@ -157,11 +157,16 @@ public class ActionExecutor {
     }
 
     private OutcomeVector wanderMove(AgentState agent, WorldGrid world) {
+        return exploratoryMove(agent, world);
+    }
+
+    // Intent: when agent is hungry but no neighbor is strictly better, MOVE should still wander rather than degenerating into IDLE.
+    private OutcomeVector exploratoryMove(AgentState agent, WorldGrid world) {
         int width = world.getWidth();
         int height = world.getHeight();
         boolean[] water = world.getWaterMask();
-        int[] candidateXs = new int[8];
-        int[] candidateYs = new int[8];
+        int chosenX = agent.getX();
+        int chosenY = agent.getY();
         int candidateCount = 0;
         for (int dy = -1; dy <= 1; dy++) {
             for (int dx = -1; dx <= 1; dx++) {
@@ -174,16 +179,17 @@ public class ActionExecutor {
                 if (water[idx]) {
                     continue;
                 }
-                candidateXs[candidateCount] = nx;
-                candidateYs[candidateCount] = ny;
                 candidateCount++;
+                if (random.nextInt(candidateCount) == 0) {
+                    chosenX = nx;
+                    chosenY = ny;
+                }
             }
         }
         if (candidateCount == 0) {
             return idle();
         }
-        int choice = random.nextInt(candidateCount);
-        agent.moveTo(candidateXs[choice], candidateYs[choice]);
+        agent.moveTo(chosenX, chosenY);
         return new OutcomeVector(-SimConfig.MOVE_ENERGY_COST, -SimConfig.MOVE_HUNGER_COST, 0f);
     }
 

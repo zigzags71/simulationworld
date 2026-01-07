@@ -62,4 +62,19 @@ class RuleSelectorTest {
 
         assertTrue(moveCount > idleCount, "Starving agents should explore instead of idling");
     }
+
+    // Intent: when hungry and no EAT rule exists, MOVE should be chosen even if IDLE has higher trust.
+    @Test
+    void hungryOverridePrefersMoveOverHighTrustIdle() {
+        AgentState agent = AgentState.forTest(new AgentId(3), 0, 0, SimConfig.INITIAL_ENERGY,
+                0.3f, SimConfig.INITIAL_STRESS, 0f);
+        ContextKey key = new ContextKey(0, 0, 0, 0, 0, 0, 0, 0);
+        List<Rule> rules = new ArrayList<>();
+        rules.add(new Rule(20, RuleType.NORMAL, key, ActionType.IDLE, OutcomeVector.zero(), 0.95f));
+        rules.add(new Rule(21, RuleType.NORMAL, key, ActionType.MOVE, OutcomeVector.zero(), 0.1f));
+
+        Rule chosen = RuleSelector.choose(rules, agent, new Random(5L));
+
+        assertTrue(chosen.getAction() == ActionType.MOVE);
+    }
 }

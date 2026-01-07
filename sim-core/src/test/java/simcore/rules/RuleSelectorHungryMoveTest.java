@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import simcore.agents.AgentId;
 import simcore.agents.AgentState;
 import simcore.config.SimConfig;
+import simcore.rules.OutcomeVector;
 
 import java.util.List;
 import java.util.Random;
@@ -17,8 +18,8 @@ class RuleSelectorHungryMoveTest {
     @Test
     void eatNotAvailableWhenOnlyTraceFood() {
         ContextKey key = new ContextKey(0, 0, 0, 0, 0, 0, 0, 1);
-        Rule eatRule = new Rule(1, RuleType.NORMAL, ActionType.EAT, key, 0.5f, 0, 0);
-        Rule moveRule = new Rule(2, RuleType.NORMAL, ActionType.MOVE, key, 0.5f, 0, 0);
+        Rule eatRule = new Rule(1L, RuleType.NORMAL, key, ActionType.EAT, OutcomeVector.zero(), 0.5f);
+        Rule moveRule = new Rule(2L, RuleType.NORMAL, key, ActionType.MOVE, OutcomeVector.zero(), 0.5f);
 
         List<Rule> applicable = RuleSelector.applicable(List.of(eatRule, moveRule), key);
 
@@ -29,8 +30,8 @@ class RuleSelectorHungryMoveTest {
     @Test
     void hungryForcesMoveWhenNoEatCandidate() {
         ContextKey key = new ContextKey(0, 0, 0, 0, 0, 0, 0, 0);
-        Rule idleRule = new Rule(1, RuleType.NORMAL, ActionType.IDLE, key, 0.95f, 0, 0);
-        Rule moveRule = new Rule(2, RuleType.NORMAL, ActionType.MOVE, key, 0.10f, 0, 0);
+        Rule idleRule = new Rule(1L, RuleType.NORMAL, key, ActionType.IDLE, OutcomeVector.zero(), 0.95f);
+        Rule moveRule = new Rule(2L, RuleType.NORMAL, key, ActionType.MOVE, OutcomeVector.zero(), 0.10f);
         AgentState agent = AgentState.forTest(new AgentId(1), 0, 0, SimConfig.INITIAL_ENERGY, 0.3f, 0f, 0f);
 
         Rule chosen = RuleSelector.choose(List.of(idleRule, moveRule), agent, new Random(1L));

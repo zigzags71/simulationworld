@@ -88,21 +88,19 @@ public final class RuleSelector {
         }
         boolean hungry = agent.getHunger() < SimConfig.CONSUME_HUNGER_THRESHOLD;
         if (hungry) {
-            Rule bestMove = null;
-            boolean hasEat = false;
-            for (Rule rule : candidates) {
-                if (rule.getAction() == ActionType.EAT) {
-                    hasEat = true;
-                    break;
-                }
-                if (rule.getAction() == ActionType.MOVE) {
-                    if (bestMove == null || rule.getTrust() > bestMove.getTrust()) {
-                        bestMove = rule;
+            boolean hasEat = candidates.stream().anyMatch(rule -> rule.getAction() == ActionType.EAT);
+            if (!hasEat) {
+                Rule bestMove = null;
+                for (Rule rule : candidates) {
+                    if (rule.getAction() == ActionType.MOVE) {
+                        if (bestMove == null || rule.getTrust() > bestMove.getTrust()) {
+                            bestMove = rule;
+                        }
                     }
                 }
-            }
-            if (!hasEat && bestMove != null) {
-                return bestMove;
+                if (bestMove != null) {
+                    return bestMove;
+                }
             }
         }
         float total = 0f;

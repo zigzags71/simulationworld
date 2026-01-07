@@ -21,13 +21,14 @@ public class MonitorBar extends HBox {
     private final Label followLabel = new Label("Follow: 0 (Tot 0)");
     private final Label activeSignalsLabel = new Label("ActiveSig: 0");
     private final Label spawnerLabel = new Label("Spawners: 0  Emitters: 0");
+    private final Label foodBudgetLabel = new Label("Food/tick: --  Max eaters/tick: --");
 
     public MonitorBar(TelemetryBus telemetryBus) {
         setSpacing(16);
         setPadding(new Insets(8));
         getChildren().addAll(tickLabel, populationLabel, predictionLabel, deathsLabel,
                 energyLabel, hungerLabel, stressLabel, fpsLabel, tpsLabel, signalsLabel, followLabel, activeSignalsLabel,
-                spawnerLabel);
+                spawnerLabel, foodBudgetLabel);
         telemetryBus.subscribe(event -> Platform.runLater(() -> onTelemetry(event)));
     }
 
@@ -43,6 +44,8 @@ public class MonitorBar extends HBox {
         followLabel.setText(String.format("Follow: %d (Tot %d)", event.getFollowMovesThisTick(), event.getTotalFollowMoves()));
         activeSignalsLabel.setText(String.format("ActiveSig: %d", event.getActiveSignalsCount()));
         spawnerLabel.setText(String.format("Spawners: %d  Emitters: %d", event.getSpawnerCount(), event.getEmitterCount()));
+        foodBudgetLabel.setText(String.format("Food/tick: %.1f  Max eaters/tick: %.1f",
+                event.getEstimatedFoodPerTick(), event.getEstimatedMaxEatersPerTick()));
     }
 
     public void updatePerformance(double fps, long tps) {

@@ -40,10 +40,12 @@ class RuleSelectorAffordanceTest {
     }
 
     @Test
+    // Intent: EAT should be available when edible food is present (not just trace amounts).
     void eatAllowedWhenFoodPresent() {
         AgentState agent = AgentState.forTest(new AgentId(6), 0, 0, 0.4f, 0.4f, 0f, 0f);
-        List<Rule> rules = buildRuleSet(1);
-        ContextKey context = new ContextKey(0, 0, 0, 0, 0, 0, 0, 1);
+        int affordance = 1 | (1 << 4);
+        List<Rule> rules = buildRuleSet(affordance);
+        ContextKey context = new ContextKey(0, 0, 0, 0, 0, 0, 0, affordance);
 
         Rule chosen = RuleSelector.choose(RuleSelector.applicable(rules, context), agent, new Random(7L));
         assertEquals(ActionType.EAT, chosen.getAction());
@@ -63,6 +65,7 @@ class RuleSelectorAffordanceTest {
     }
 
     @Test
+    // Intent: FOLLOW_SIGNAL should be available when only trace food is present, but EAT should not be.
     void followAllowedWhenOnlyTraceFoodAndSignalPresent() {
         AgentState agent = AgentState.forTest(new AgentId(9), 0, 0, 0.4f, 0.2f, 0f, 0f);
         int affordance = (1) | (1 << 1);
@@ -72,7 +75,7 @@ class RuleSelectorAffordanceTest {
         List<Rule> applicable = RuleSelector.applicable(rules, context);
 
         assertTrue(applicable.stream().anyMatch(rule -> rule.getAction() == ActionType.FOLLOW_SIGNAL));
-        assertTrue(applicable.stream().anyMatch(rule -> rule.getAction() == ActionType.EAT));
+        assertTrue(applicable.stream().noneMatch(rule -> rule.getAction() == ActionType.EAT));
     }
 
     @Test

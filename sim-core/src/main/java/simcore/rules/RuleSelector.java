@@ -75,7 +75,7 @@ public final class RuleSelector {
         boolean broadcastReady = (affordance & (1 << 3)) != 0;
         boolean broadcastAvailable = (affordance & (1 << 5)) != 0;
         return switch (action) {
-            case EAT -> hasAnyFoodHere;
+            case EAT -> hasGoodFoodHere;
             case FOLLOW_SIGNAL -> hasSignal && !hasGoodFoodHere;
             case BROADCAST_SIGNAL -> broadcastAvailable && emitterNearby && broadcastReady;
             case MOVE, IDLE -> true;
@@ -85,6 +85,23 @@ public final class RuleSelector {
     public static Rule choose(List<Rule> candidates, AgentState agent, Random random) {
         if (candidates.isEmpty()) {
             return null;
+        }
+        boolean hungry = agent.getHunger() < SimConfig.CONSUME_HUNGER_THRESHOLD;
+        if (hungry) {
+            boolean hasEat = candidates.stream().anyMatch(rule -> rule.getAction() == ActionType.EAT);
+            if (!hasEat) {
+                Rule bestMove = null;
+                for (Rule rule : candidates) {
+                    if (rule.getAction() == ActionType.MOVE) {
+                        if (bestMove == null || rule.getTrust() > bestMove.getTrust()) {
+                            bestMove = rule;
+                        }
+                    }
+                }
+                if (bestMove != null) {
+                    return bestMove;
+                }
+            }
         }
         float total = 0f;
         float[] weights = new float[candidates.size()];
@@ -112,13 +129,19 @@ public final class RuleSelector {
     }
 
     private static float needUtility(ActionType action, AgentState agent) {
+        float hunger = MathUtil.clamp01(agent.getHunger());
+        float stress = MathUtil.clamp01(agent.getStress());
+        float hungry = 1f - hunger;
+
         return switch (action) {
-            case EAT -> 1f - agent.getHunger();
-            case MOVE -> MathUtil.clamp01(agent.getStress());
-            case IDLE -> MathUtil.clamp01(1f - agent.getStress());
-            case BROADCAST_SIGNAL -> MathUtil.clamp01(agent.getHunger()) * 0.5f
-                    + MathUtil.clamp01(agent.getStress()) * 0.1f;
-            case FOLLOW_SIGNAL -> MathUtil.clamp01(1f - agent.getHunger());
+            case EAT -> hungry;
+
+            case MOVE -> MathUtil.clamp01(hungry * 1.0f + stress * 0.15f);
+
+            case IDLE -> MathUtil.clamp01(hunger * (1f - stress));
+
+            case BROADCAST_SIGNAL -> MathUtil.clamp01(hunger) * 0.5f + stress * 0.1f;
+            case FOLLOW_SIGNAL -> hungry;
         };
     }
 }

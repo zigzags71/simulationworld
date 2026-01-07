@@ -17,13 +17,16 @@ public class TelemetryEvent {
     private final float meanHazard;
     private final int emitterCount;
     private final int spawnerCount;
+    private final float estimatedFoodPerTick;
+    private final float estimatedMaxEatersPerTick;
 
     public TelemetryEvent(long tickIndex, int population, float meanPredictionError, int deathsThisTick, int totalDeaths,
                           int signalsEmittedThisTick, int followMovesThisTick,
                           int activeSignalsCount,
                           long totalSignalsEmitted, long totalFollowMoves,
                           float meanEnergy, float meanHunger, float meanStress, float meanHazard,
-                          int emitterCount, int spawnerCount) {
+                          int emitterCount, int spawnerCount,
+                          float estimatedFoodPerTick, float estimatedMaxEatersPerTick) {
         this.tickIndex = tickIndex;
         this.population = population;
         this.meanPredictionError = meanPredictionError;
@@ -40,6 +43,8 @@ public class TelemetryEvent {
         this.meanHazard = meanHazard;
         this.emitterCount = emitterCount;
         this.spawnerCount = spawnerCount;
+        this.estimatedFoodPerTick = estimatedFoodPerTick;
+        this.estimatedMaxEatersPerTick = estimatedMaxEatersPerTick;
     }
 
     public long getTickIndex() {
@@ -104,5 +109,13 @@ public class TelemetryEvent {
 
     public int getSpawnerCount() {
         return spawnerCount;
+    }
+
+    public float getEstimatedFoodPerTick() {
+        return estimatedFoodPerTick;
+    }
+
+    public float getEstimatedMaxEatersPerTick() {
+        return estimatedMaxEatersPerTick;
     }
 }

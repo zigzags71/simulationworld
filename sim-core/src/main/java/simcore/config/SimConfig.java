@@ -8,7 +8,7 @@ public final class SimConfig {
     public static final int WORLD_H = 1024;
     public static final int TICK_RATE = 20;
     public static final int RENDER_MAX_FPS = 180;
-    public static final int NUM_AGENTS = 5_000;
+    public static final int NUM_AGENTS = 600;
     public static final int MAX_RENDERED_AGENTS = 20_000;
     public static final long DEFAULT_SEED = 1337L;
     public static final int FIELD_BIN_COUNT = 5;
@@ -61,6 +61,7 @@ public final class SimConfig {
     public static final float MOVE_HAZARD_WEIGHT = 0.8f;
     public static final float MOVE_ENERGY_COST = 0.0006f;
     public static final float MOVE_HUNGER_COST = 0.0005f;
+    public static final float MOVE_WANDER_HUNGER_THRESHOLD = 0.55f;
 
     public static final int PATTERN_FOLLOW_LOCK_TICKS = 60;
     public static final int PATTERN_FOOD_LOCK_TICKS = 45;
@@ -69,6 +70,8 @@ public final class SimConfig {
 
     public static final float IDLE_STRESS_RECOVERY_BONUS = 0.0002f;
 
+    public static final int CROWDING_RADIUS = 6;
+    public static final float CROWDING_FOOD_WEIGHT = 0.35f;
     public static final float CROWDING_MAX_EXPECTED = 6f;
 
     public static final int STRESS_NEIGHBOR_RADIUS = 8;

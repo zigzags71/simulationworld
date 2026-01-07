@@ -74,6 +74,8 @@ public class AgentSystem {
         int[] crowding = computeCrowding(width, world.getHeight());
         int agentCount = agents.size();
         ensureBuffers(agentCount);
+        actionExecutor.prepareWorld(world);
+        actionExecutor.resetClaimsForTick();
         actionExecutor.beginTick(agentCount);
         actionExecutor.setMetrics(metrics);
         for (int i = 0; i < agentCount; i++) {
@@ -182,6 +184,10 @@ public class AgentSystem {
         metrics.setTotalDeaths(totalDeaths);
         actionExecutor.setMetrics(null);
         return metrics;
+    }
+
+    public float computeLocalFoodCrowding(WorldGrid world, int ax, int ay) {
+        return actionExecutor.computeLocalFoodCrowding(world, ax, ay, SimConfig.CROWDING_RADIUS);
     }
 
     private void ensureBuffers(int count) {
